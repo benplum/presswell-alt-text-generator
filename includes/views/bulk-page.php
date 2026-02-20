@@ -4,21 +4,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Alt Text Bulk Generator', 'presswell-alt-text' ); ?></h1>
-	<p><?php esc_html_e( 'Generate alt text for existing images. By default only images with missing alt text are processed.', 'presswell-alt-text' ); ?></p>
+	<h1><?php echo esc_html__( 'Alt Text Bulk Generator', $text_domain ); ?></h1>
+	<p><?php echo esc_html__( 'Generate alt text for existing images. By default only images with missing alt text are processed.', $text_domain ); ?></p>
 	<p>
 		<label>
 			<input type="checkbox" id="pwatg_regenerate_existing" value="1" />
-			<?php esc_html_e( 'Regenerate existing alt text', 'presswell-alt-text' ); ?>
+			<?php echo esc_html__( 'Regenerate existing alt text', $text_domain ); ?>
 		</label>
 	</p>
 	<p>
-		<label for="pwatg_limit"><strong><?php esc_html_e( 'Limit', 'presswell-alt-text' ); ?></strong></label><br />
+		<label for="pwatg_limit"><strong><?php echo esc_html__( 'Limit', $text_domain ); ?></strong></label><br />
 		<input id="pwatg_limit" type="number" min="1" max="500" value="50" />
 	</p>
 
 	<p>
-		<button type="button" class="button button-primary" id="pwatg_start_bulk"><?php esc_html_e( 'Run Bulk Generation', 'presswell-alt-text' ); ?></button>
+		<button type="button" class="button button-primary" id="pwatg_start_bulk"><?php echo esc_html__( 'Run Bulk Generation', $text_domain ); ?></button>
 	</p>
 
 	<div id="pwatg_progress_wrap" class="pwatg-progress-wrap">
@@ -31,10 +31,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<table id="pwatg_results_table" class="wp-list-table widefat fixed striped pwatg-results-table">
 		<thead>
 			<tr>
-				<th class="pwatg-col-thumb"><?php esc_html_e( 'Thumbnail', 'presswell-alt-text' ); ?></th>
-				<th class="pwatg-col-id"><?php esc_html_e( 'Media ID', 'presswell-alt-text' ); ?></th>
-				<th class="pwatg-col-status"><?php esc_html_e( 'Status', 'presswell-alt-text' ); ?></th>
-				<th><?php esc_html_e( 'Alt Text Generated', 'presswell-alt-text' ); ?></th>
+				<th class="pwatg-col-thumb"><?php echo esc_html__( 'Thumbnail', $text_domain ); ?></th>
+				<th class="pwatg-col-id"><?php echo esc_html__( 'Media ID', $text_domain ); ?></th>
+				<th class="pwatg-col-status"><?php echo esc_html__( 'Status', $text_domain ); ?></th>
+				<th><?php echo esc_html__( 'Alt Text Generated', $text_domain ); ?></th>
 			</tr>
 		</thead>
 		<tbody id="pwatg_results_body"></tbody>
