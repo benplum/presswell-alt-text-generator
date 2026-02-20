@@ -47,7 +47,7 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
 			add_action( 'admin_menu', [ $this, 'register_admin_pages' ] );
 			add_action( 'admin_init', [ $this, 'register_settings' ] );
 			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
-			add_action( 'add_attachment', [ $this, 'maybe_generate_on_upload' ], 20 );
+			add_filter( 'wp_generate_attachment_metadata', [ $this, 'maybe_generate_on_upload_from_metadata' ], 20, 2 );
 			add_action( 'admin_post_pwatg_run_bulk', [ $this, 'handle_bulk_generation' ] );
 			add_action( 'wp_ajax_pwatg_bulk_init', [ $this, 'handle_bulk_init_ajax' ] );
 			add_action( 'wp_ajax_pwatg_bulk_generate', [ $this, 'handle_bulk_generate_ajax' ] );

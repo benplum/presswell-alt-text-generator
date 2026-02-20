@@ -70,6 +70,12 @@ trait PWATG_Media_Trait {
 		return;
 	}
 
+	public function maybe_generate_on_upload_from_metadata( $metadata, $attachment_id ) {
+		$this->maybe_generate_on_upload( $attachment_id );
+
+		return $metadata;
+	}
+
 	public function maybe_generate_on_upload( $attachment_id ) {
 		$settings = $this->get_settings();
 		if ( empty( $settings['auto_generate'] ) ) {
