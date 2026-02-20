@@ -1,0 +1,73 @@
+.pwatg-progress-wrap {
+	display: none;
+	max-width: 640px;
+	margin-top: 14px;
+}
+
+.pwatg-progress-track {
+	height: 14px;
+	background: #e2e4e7;
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.pwatg-progress-bar {
+	height: 14px;
+	width: 0;
+	background: #2271b1;
+	transition: width .2s ease;
+}
+
+.pwatg-progress-text {
+	margin-top: 8px;
+}
+
+.pwatg-results-table {
+	display: none;
+	max-width: 900px;
+	margin-top: 16px;
+}
+
+.pwatg-col-thumb {
+	width: 90px;
+}
+
+.pwatg-col-id {
+	width: 100px;
+}
+
+.pwatg-col-status {
+	width: 110px;
+}
+
+.pwatg-thumb-image {
+	width: 60px;
+	height: 60px;
+	object-fit: cover;
+	border-radius: 4px;
+}
+
+.pwatg-status-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: capitalize;
+	line-height: 1.6;
+}
+
+.pwatg-status-updated {
+	background: #d1e7dd;
+	color: #0f5132;
+}
+
+.pwatg-status-failed {
+	background: #f8d7da;
+	color: #842029;
+}
+
+.pwatg-status-skipped {
+	background: #e2e3e5;
+	color: #41464b;
+}
