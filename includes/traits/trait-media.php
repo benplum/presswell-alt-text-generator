@@ -13,11 +13,16 @@ trait PWATG_Media_Trait {
 		}
 
 		if ( current_user_can( 'upload_files' ) && current_user_can( 'edit_post', $post->ID ) ) {
-			$url = $this->get_single_action_url( $post->ID );
+			$url         = $this->get_single_action_url( $post->ID );
+			$current_alt = (string) get_post_meta( $post->ID, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+			$has_alt     = '' !== trim( $current_alt );
 			$actions['pwatg_generate_alt'] = $this->render_view_to_string(
 				'media-row-action.php',
 				[
 					'url' => $url,
+					'attachment_id' => (int) $post->ID,
+					'has_alt' => $has_alt,
+					'button_label' => $has_alt ? __( 'Regenerate Alt Text', $text_domain ) : __( 'Generate Alt Text', $text_domain ),
 					'text_domain' => $text_domain,
 				]
 			);
@@ -39,6 +44,8 @@ trait PWATG_Media_Trait {
 
 		$url            = $this->get_single_action_url( $post->ID );
 		$last_generated = $this->get_last_generated_label( $post->ID );
+		$current_alt    = (string) get_post_meta( $post->ID, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+		$has_alt        = '' !== trim( $current_alt );
 
 		$form_fields['pwatg_generate_alt'] = [
 			'label' => __( 'Alt Text Generator', $text_domain ),
@@ -47,11 +54,14 @@ trait PWATG_Media_Trait {
 				'media-modal-action.php',
 				[
 					'url'            => $url,
+					'attachment_id'  => (int) $post->ID,
+					'has_alt'        => $has_alt,
+					'button_label'   => $has_alt ? __( 'Regenerate Alt Text', $text_domain ) : __( 'Generate Alt Text', $text_domain ),
 					'last_generated' => $last_generated,
 					'text_domain'    => $text_domain,
 				]
 			),
-			'helps' => __( 'Runs AI alt text generation for this image and reloads with a status notice.', $text_domain ),
+			'helps' => __( 'Runs AI alt text generation for this image.', $text_domain ),
 		];
 
 		if ( isset( $form_fields['image_alt'] ) ) {
@@ -111,7 +121,7 @@ trait PWATG_Media_Trait {
 			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
 		}
 
-		check_admin_referer( $this->get_nonce_action( 'generate_single_' . $attachment_id ) );
+		check_admin_referer( 'pwtag_generate_single_' . $attachment_id );
 
 		$result = $this->generate_alt_text_for_attachment( $attachment_id, true );
 		$status = 'error';
@@ -141,12 +151,68 @@ trait PWATG_Media_Trait {
 		exit;
 	}
 
+	public function handle_single_generation_ajax() {
+		$text_domain = $this->get_text_domain();
+
+		$attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
+
+		if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
+		}
+
+		check_ajax_referer( 'pwatg_generate_single_' . $attachment_id, 'nonce' );
+
+		$result = $this->generate_alt_text_for_attachment( $attachment_id, true );
+		$status = 'error';
+
+		if ( true === $result ) {
+			$status = 'updated';
+		} elseif ( false === $result ) {
+			$status = 'skipped';
+		} elseif ( is_wp_error( $result ) && 'pwatg_missing_api_key' === $result->get_error_code() ) {
+			$status = 'missing_key';
+		}
+
+		$messages = [
+			'updated'     => __( 'Alt text generated successfully.', $text_domain ),
+			'skipped'     => __( 'No changes were needed for this image.', $text_domain ),
+			'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', $text_domain ),
+			'error'       => __( 'Could not generate alt text for this image.', $text_domain ),
+		];
+
+		$alt_text       = (string) get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+		$last_generated = $this->get_last_generated_label( $attachment_id );
+
+		if ( in_array( $status, [ 'error', 'missing_key' ], true ) ) {
+			wp_send_json_error(
+				[
+					'status'         => $status,
+					'message'        => isset( $messages[ $status ] ) ? $messages[ $status ] : __( 'Could not generate alt text for this image.', $text_domain ),
+					'attachment_id'  => $attachment_id,
+					'alt_text'       => $alt_text,
+					'last_generated' => $last_generated,
+				],
+				200
+			);
+		}
+
+		wp_send_json_success(
+			[
+				'status'         => $status,
+				'message'        => isset( $messages[ $status ] ) ? $messages[ $status ] : '',
+				'attachment_id'  => $attachment_id,
+				'alt_text'       => $alt_text,
+				'last_generated' => $last_generated,
+			]
+		);
+	}
+
 	public function get_single_action_url( $attachment_id ) {
 		$attachment_id = absint( $attachment_id );
 
 		return wp_nonce_url(
-			admin_url( 'admin-post.php?action=' . $this->get_action_name( 'generate_single' ) . '&attachment_id=' . $attachment_id ),
-			$this->get_nonce_action( 'generate_single_' . $attachment_id )
+			admin_url( 'admin-post.php?action=pwatg_generate_single&attachment_id=' . $attachment_id ),
+			'pwatg_generate_single_' . $attachment_id
 		);
 	}
 

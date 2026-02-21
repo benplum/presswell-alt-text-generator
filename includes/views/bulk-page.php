@@ -12,10 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php echo esc_html__( 'Regenerate existing alt text', $text_domain ); ?>
 		</label>
 	</p>
-	<p>
-		<label for="pwatg_limit"><strong><?php echo esc_html__( 'Limit', $text_domain ); ?></strong></label><br />
-		<input id="pwatg_limit" type="number" min="1" max="500" value="50" />
-	</p>
 
 	<p>
 		<button type="button" class="button button-primary" id="pwatg_start_bulk"><?php echo esc_html__( 'Run Bulk Generation', $text_domain ); ?></button>

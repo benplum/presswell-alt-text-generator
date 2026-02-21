@@ -6,7 +6,6 @@ jQuery(function($) {
 	const progressWrap = $('#pwatg_progress_wrap');
 	const progressBar = $('#pwatg_progress_bar');
 	const progressText = $('#pwatg_progress_text');
-	const limitInput = $('#pwatg_limit');
 	const regenerateInput = $('#pwatg_regenerate_existing');
 	const resultsTable = $('#pwatg_results_table');
 	const resultsBody = $('#pwatg_results_body');
@@ -17,7 +16,7 @@ jQuery(function($) {
 	let processed = 0;
 	let updated = 0;
 	let failed = 0;
-	const batchSize = 10;
+	const batchSize = 5;
 
 	function t(key, fallback) {
 		return Object.prototype.hasOwnProperty.call(i18n, key) ? i18n[key] : fallback;
@@ -91,7 +90,6 @@ jQuery(function($) {
 	}
 
 	startButton.on('click', function() {
-		const limit = Math.max(1, Math.min(500, parseInt(limitInput.val(), 10) || 50));
 		startButton.prop('disabled', true).text(t('preparing', 'Preparing…'));
 		progressWrap.show();
 		progressBar.css('width', '0%');
@@ -102,7 +100,6 @@ jQuery(function($) {
 		$.post(ajaxurl, {
 			action: 'pwatg_bulk_init',
 			nonce: nonce,
-			limit: limit,
 			regenerate_existing: regenerateInput.is(':checked') ? 1 : 0
 		}).done(function(response) {
 			if (!response || !response.success) {

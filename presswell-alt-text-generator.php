@@ -62,11 +62,12 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
 			add_action( 'admin_init', [ $this, 'register_settings' ] );
 			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 			add_filter( 'wp_generate_attachment_metadata', [ $this, 'maybe_generate_on_upload_from_metadata' ], 20, 2 );
-			add_action( $this->get_admin_post_hook( 'run_bulk' ), [ $this, 'handle_bulk_generation' ] );
-			add_action( $this->get_ajax_hook( 'bulk_init' ), [ $this, 'handle_bulk_init_ajax' ] );
-			add_action( $this->get_ajax_hook( 'bulk_generate' ), [ $this, 'handle_bulk_generate_ajax' ] );
-			add_action( $this->get_admin_post_hook( 'generate_single' ), [ $this, 'handle_single_generation' ] );
-			add_action( $this->get_admin_post_hook( 'test_connection' ), [ $this, 'handle_test_connection' ] );
+			add_action( 'admin_post_pwatg_run_bulk', [ $this, 'handle_bulk_generation' ] );
+			add_action( 'wp_ajax_bulk_init', [ $this, 'handle_bulk_init_ajax' ] );
+			add_action( 'wp_ajax_bulk_generate', [ $this, 'handle_bulk_generate_ajax' ] );
+			add_action( 'admin_post_pwatg_generate_single', [ $this, 'handle_single_generation' ] );
+			add_action( 'wp_ajax_generate_single', [ $this, 'handle_single_generation_ajax' ] );
+			add_action( 'admin_post_pwatg_test_connection', [ $this, 'handle_test_connection' ] );
 			add_filter( 'media_row_actions', [ $this, 'add_media_row_action' ], 10, 2 );
 			add_filter( 'attachment_fields_to_edit', [ $this, 'add_media_modal_action_field' ], 10, 2 );
 			add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );

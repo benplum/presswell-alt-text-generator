@@ -42,30 +42,6 @@ if ( ! class_exists( 'PWATG_Plugin_Helper' ) ) {
 			return $base . ltrim( $path, '/' );
 		}
 
-		public function get_plugin_key() {
-			return $this->plugin_key;
-		}
-
-		public function get_option_key() {
-			return $this->option_key;
-		}
-
-		public function get_action_name( $suffix ) {
-			return $this->plugin_key . '_' . sanitize_key( $suffix );
-		}
-
-		public function get_admin_post_hook( $suffix ) {
-			return 'admin_post_' . $this->get_action_name( $suffix );
-		}
-
-		public function get_ajax_hook( $suffix ) {
-			return 'wp_ajax_' . $this->get_action_name( $suffix );
-		}
-
-		public function get_nonce_action( $suffix ) {
-			return $this->get_action_name( $suffix );
-		}
-
 		public function get_settings_page_slug() {
 			return $this->settings_page_slug;
 		}
@@ -88,10 +64,6 @@ if ( ! class_exists( 'PWATG_Plugin_Helper' ) ) {
 
 		public function get_bulk_page_url() {
 			return admin_url( 'upload.php?page=' . $this->get_bulk_page_slug() );
-		}
-
-		public function get_asset_handle( $suffix ) {
-			return $this->plugin_key . '-' . ltrim( $suffix, '-' );
 		}
 
 		public function get_asset_url( $relative_path ) {

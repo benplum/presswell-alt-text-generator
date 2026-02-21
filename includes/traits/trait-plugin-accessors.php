@@ -13,30 +13,6 @@ trait PWATG_Plugin_Accessors_Trait {
 		return $this->get_plugin_helper()->get_plugin_url( $path );
 	}
 
-	public function get_plugin_key() {
-		return $this->get_plugin_helper()->get_plugin_key();
-	}
-
-	public function get_option_key() {
-		return $this->get_plugin_helper()->get_option_key();
-	}
-
-	public function get_action_name( $suffix ) {
-		return $this->get_plugin_helper()->get_action_name( $suffix );
-	}
-
-	public function get_admin_post_hook( $suffix ) {
-		return $this->get_plugin_helper()->get_admin_post_hook( $suffix );
-	}
-
-	public function get_ajax_hook( $suffix ) {
-		return $this->get_plugin_helper()->get_ajax_hook( $suffix );
-	}
-
-	public function get_nonce_action( $suffix ) {
-		return $this->get_plugin_helper()->get_nonce_action( $suffix );
-	}
-
 	public function get_settings_page_slug() {
 		return $this->get_plugin_helper()->get_settings_page_slug();
 	}
@@ -59,10 +35,6 @@ trait PWATG_Plugin_Accessors_Trait {
 
 	public function get_bulk_page_url() {
 		return $this->get_plugin_helper()->get_bulk_page_url();
-	}
-
-	public function get_asset_handle( $suffix ) {
-		return $this->get_plugin_helper()->get_asset_handle( $suffix );
 	}
 
 	public function get_asset_url( $relative_path ) {

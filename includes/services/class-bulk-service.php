@@ -12,14 +12,12 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
 			$this->plugin = $plugin;
 		}
 
-		public function get_attachment_ids( $regenerate_existing, $limit ) {
-			$limit = max( 1, min( 500, absint( $limit ) ) );
-
+		public function get_attachment_ids( $regenerate_existing ) {
 			$args = [
 				'post_type'      => 'attachment',
 				'post_status'    => 'inherit',
 				'post_mime_type' => 'image',
-				'posts_per_page' => $limit,
+				'posts_per_page' => -1,
 				'fields'         => 'ids',
 				'orderby'        => 'ID',
 				'order'          => 'DESC',
@@ -106,8 +104,8 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
 			];
 		}
 
-		public function run_bulk_generation( $regenerate_existing, $limit ) {
-			$attachment_ids = $this->get_attachment_ids( $regenerate_existing, $limit );
+		public function run_bulk_generation( $regenerate_existing ) {
+			$attachment_ids = $this->get_attachment_ids( $regenerate_existing );
 
 			$processed = 0;
 			$updated   = 0;

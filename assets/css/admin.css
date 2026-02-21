@@ -25,3 +25,7 @@
 .pwatg-inline-action-meta {
 	margin: 6px 0 0;
 }
+
+.wp_attachment_details #attachment_alt {
+	max-width: none;
+}

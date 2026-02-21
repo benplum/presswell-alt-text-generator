@@ -12,11 +12,10 @@ trait PWATG_Bulk_Trait {
 			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
 		}
 
-		check_ajax_referer( $this->get_nonce_action( 'bulk_ajax' ), 'nonce' );
+		check_ajax_referer( 'pwatg_bulk_ajax', 'nonce' );
 
 		$regenerate_existing = ! empty( $_POST['regenerate_existing'] );
-		$limit               = isset( $_POST['limit'] ) ? absint( wp_unslash( $_POST['limit'] ) ) : 50;
-		$ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing, $limit );
+		$ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing );
 
 		wp_send_json_success(
 			[
@@ -33,11 +32,11 @@ trait PWATG_Bulk_Trait {
 			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
 		}
 
-		check_ajax_referer( $this->get_nonce_action( 'bulk_ajax' ), 'nonce' );
+		check_ajax_referer( 'pwatg_bulk_ajax', 'nonce' );
 
 		$raw_ids            = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
 		$offset             = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
-		$batch_size         = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 10;
+		$batch_size         = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
 		$regenerate_existing = ! empty( $_POST['regenerate_existing'] );
 
 		$results = $this->get_bulk_service()->process_batch( $raw_ids, $offset, $batch_size, $regenerate_existing );
@@ -73,11 +72,10 @@ trait PWATG_Bulk_Trait {
 			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
 		}
 
-		check_admin_referer( $this->get_nonce_action( 'run_bulk' ) );
+		check_admin_referer( 'pwatg_run_bulk' );
 
 		$regenerate_existing = ! empty( $_POST['regenerate_existing'] );
-		$limit               = isset( $_POST['limit'] ) ? absint( $_POST['limit'] ) : 50;
-		$results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing, $limit );
+		$results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing );
 
 		set_transient(
 			Presswell_Alt_Text_Generator::NOTICE_KEY,

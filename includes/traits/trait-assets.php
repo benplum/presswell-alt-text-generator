@@ -15,7 +15,7 @@ trait PWATG_Assets_Trait {
 		$should_enqueue_admin_css = $this->is_settings_page( $hook_suffix ) || current_user_can( 'upload_files' );
 		if ( $should_enqueue_admin_css ) {
 			wp_enqueue_style(
-				$this->get_asset_handle( 'admin' ),
+				'pwatg-css-admin',
 				$this->get_asset_url( 'css/admin.css' ),
 				[],
 				$this->get_asset_version()
@@ -31,7 +31,7 @@ trait PWATG_Assets_Trait {
 			}
 
 			wp_enqueue_script(
-				$this->get_asset_handle( 'settings' ),
+				'pwatg-js-settings',
 				$this->get_asset_url( 'js/settings.js' ),
 				[],
 				$this->get_asset_version(),
@@ -39,10 +39,10 @@ trait PWATG_Assets_Trait {
 			);
 
 			wp_localize_script(
-				$this->get_asset_handle( 'settings' ),
+				'pwatg-js-settings',
 				'pwatgSettingsData',
 				[
-					'optionKey'    => $this->get_option_key(),
+					'optionKey'    => '',
 					'modelMap'     => $model_map,
 					'currentModel' => (string) $settings['model'],
 				]
@@ -51,14 +51,14 @@ trait PWATG_Assets_Trait {
 
 		if ( $this->is_bulk_page( $hook_suffix ) ) {
 			wp_enqueue_style(
-				$this->get_asset_handle( 'bulk' ),
+				'pwatg-css-bulk',
 				$this->get_asset_url( 'css/bulk.css' ),
 				[],
 				$this->get_asset_version()
 			);
 
 			wp_enqueue_script(
-				$this->get_asset_handle( 'bulk' ),
+				'pwatg-js-bulk',
 				$this->get_asset_url( 'js/bulk.js' ),
 				[ 'jquery' ],
 				$this->get_asset_version(),
@@ -66,10 +66,10 @@ trait PWATG_Assets_Trait {
 			);
 
 			wp_localize_script(
-				$this->get_asset_handle( 'bulk' ),
+				'pwatg-js-bulk',
 				'pwatgBulkData',
 				[
-					'nonce' => wp_create_nonce( $this->get_nonce_action( 'bulk_ajax' ) ),
+					'nonce' => wp_create_nonce( 'pwatg_bulk_ajax' ),
 					'i18n'  => [
 						'runBulk'      => __( 'Run Bulk Generation', $text_domain ),
 						'bulkComplete' => __( 'Bulk generation complete.', $text_domain ),
@@ -90,14 +90,17 @@ trait PWATG_Assets_Trait {
 			$current_post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
 			$inline_url      = '';
 			$inline_last     = '';
+			$inline_has_alt  = false;
 
 			if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
-				$inline_url  = $this->get_single_action_url( $current_post_id );
-				$inline_last = $this->get_last_generated_label( $current_post_id );
+				$inline_url     = $this->get_single_action_url( $current_post_id );
+				$inline_last    = $this->get_last_generated_label( $current_post_id );
+				$inline_current = (string) get_post_meta( $current_post_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+				$inline_has_alt = '' !== trim( $inline_current );
 			}
 
 			wp_enqueue_script(
-				$this->get_asset_handle( 'media' ),
+				'pwatg-jsmedia',
 				$this->get_asset_url( 'js/media.js' ),
 				[ 'jquery' ],
 				$this->get_asset_version(),
@@ -105,15 +108,23 @@ trait PWATG_Assets_Trait {
 			);
 
 			wp_localize_script(
-				$this->get_asset_handle( 'media' ),
+				'pwatg-js-media',
 				'pwatgMediaData',
 				[
 					'inlineUrl'  => $inline_url,
 					'inlineLast' => $inline_last,
+					'inlineHasAlt' => $inline_has_alt,
+					'ajaxAction' => 'pwatg_generate_single',
 					'strings'    => [
 						'generateButton'    => __( 'Generate Alt Text', $text_domain ),
+						'generatingButton'  => __( 'Generating...', $text_domain ),
+						'regenerateButton'  => __( 'Regenerate Alt Text', $text_domain ),
 						'lastGeneratedLabel'=> __( 'Last generated:', $text_domain ),
 						'never'             => __( 'Never', $text_domain ),
+						'updated'           => __( 'Alt text generated successfully.', $text_domain ),
+						'skipped'           => __( 'No changes were needed for this image.', $text_domain ),
+						'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings.', $text_domain ),
+						'error'             => __( 'Could not generate alt text for this image.', $text_domain ),
 					],
 				]
 			);

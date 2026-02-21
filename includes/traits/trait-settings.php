@@ -7,11 +7,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait PWATG_Settings_Trait {
 	public function register_settings() {
 		$text_domain = $this->get_text_domain();
-		$option_key  = $this->get_option_key();
 
 		register_setting(
 			'pwatg_settings_group',
-			$option_key,
+			'pwatg_options',
 			[
 				'type'              => 'array',
 				'sanitize_callback' => [ $this, 'sanitize_settings' ],
@@ -117,7 +116,7 @@ trait PWATG_Settings_Trait {
 
 	public function get_settings() {
 		$defaults = $this->get_default_settings();
-		$settings = wp_parse_args( get_option( $this->get_option_key(), [] ), $defaults );
+		$settings = wp_parse_args( get_option( 'pwatg_options', [] ), $defaults );
 
 		if ( ! isset( $settings['api_keys'] ) || ! is_array( $settings['api_keys'] ) ) {
 			$settings['api_keys'] = $defaults['api_keys'];
@@ -296,9 +295,9 @@ trait PWATG_Settings_Trait {
 		$this->render_view(
 			'settings-page.php',
 			[
-				'text_domain' => $this->get_text_domain(),
-				'test_connection_action' => $this->get_action_name( 'test_connection' ),
-				'test_connection_nonce_action' => $this->get_nonce_action( 'test_connection' ),
+				'text_domain' => 'presswell-alt-text',
+				'test_connection_action' => 'pwatg_test_connection',
+				'test_connection_nonce_action' => 'pwatg_test_connection',
 			]
 		);
 	}
@@ -310,7 +309,7 @@ trait PWATG_Settings_Trait {
 			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
 		}
 
-		check_admin_referer( $this->get_nonce_action( 'test_connection' ), 'pwatg_test_connection_nonce' );
+		check_admin_referer( 'pwatg_test_connection', 'pwatg_test_connection_nonce' );
 
 		$service = isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '';
 		$model   = isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '';
