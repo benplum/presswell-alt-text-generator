@@ -16,7 +16,7 @@ trait PWATG_Assets_Trait {
 		if ( $should_enqueue_admin_css ) {
 			wp_enqueue_style(
 				$this->get_asset_handle( 'admin' ),
-				$this->get_asset_url( 'css/pwatg-admin.css' ),
+				$this->get_asset_url( 'css/admin.css' ),
 				[],
 				$this->get_asset_version()
 			);
@@ -32,7 +32,7 @@ trait PWATG_Assets_Trait {
 
 			wp_enqueue_script(
 				$this->get_asset_handle( 'settings' ),
-				$this->get_asset_url( 'js/pwatg-settings.js' ),
+				$this->get_asset_url( 'js/settings.js' ),
 				[],
 				$this->get_asset_version(),
 				true
@@ -52,14 +52,14 @@ trait PWATG_Assets_Trait {
 		if ( $this->is_bulk_page( $hook_suffix ) ) {
 			wp_enqueue_style(
 				$this->get_asset_handle( 'bulk' ),
-				$this->get_asset_url( 'css/pwatg-bulk.css' ),
+				$this->get_asset_url( 'css/bulk.css' ),
 				[],
 				$this->get_asset_version()
 			);
 
 			wp_enqueue_script(
 				$this->get_asset_handle( 'bulk' ),
-				$this->get_asset_url( 'js/pwatg-bulk.js' ),
+				$this->get_asset_url( 'js/bulk.js' ),
 				[ 'jquery' ],
 				$this->get_asset_version(),
 				true
@@ -98,7 +98,7 @@ trait PWATG_Assets_Trait {
 
 			wp_enqueue_script(
 				$this->get_asset_handle( 'media' ),
-				$this->get_asset_url( 'js/pwatg-media.js' ),
+				$this->get_asset_url( 'js/media.js' ),
 				[ 'jquery' ],
 				$this->get_asset_version(),
 				true
