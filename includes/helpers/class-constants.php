@@ -29,6 +29,13 @@ class PWATG {
   const NONCE_GENERATE_SINGLE = 'pwatg_generate_single_';
   const NONCE_GENERATE_BULK = 'pwatg_generate_bulk';
 
+  // Rate limiting
+  const RATE_LIMIT_TRANSIENT = 'pwatg_rate_limit_lock';
+  const RATE_LIMIT_MIN_SECONDS = 60;
+  const RATE_LIMIT_DEFAULT_SECONDS = 300;
+  const RATE_LIMIT_MAX_SECONDS = 1800;
+  const QUOTA_LOCK_SECONDS = 3600;
+
   // AJAX Actions
   const AJAX_GENERATE_SINGLE = 'pwatg_generate_single';
   const AJAX_GENERATE_BULK = 'pwatg_generate_bulk';

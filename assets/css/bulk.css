@@ -71,3 +71,24 @@
   background: #e2e3e5;
   color: #41464b;
 }
+
+.pwatg-result-error {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid #d63638;
+  background: #fff5f5;
+  font-size: 12px;
+  color: #842029;
+}
+
+.pwatg-result-error-code {
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.pwatg-result-error-hint {
+  margin-left: 4px;
+  font-weight: 600;
+  color: #5c1a1d;
+}

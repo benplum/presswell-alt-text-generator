@@ -29,6 +29,17 @@ trait PWATG_Bulk_Trait {
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
 
+    $lock = $this->get_rate_limit_lock_state();
+    if ( $lock ) {
+      wp_send_json_error(
+        [
+          'message' => $lock['message'],
+          'code'    => $lock['code'],
+        ],
+        429
+      );
+    }
+
     $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
     $ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing );
 
@@ -46,6 +57,17 @@ trait PWATG_Bulk_Trait {
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
+
+    $lock = $this->get_rate_limit_lock_state();
+    if ( $lock ) {
+      wp_send_json_error(
+        [
+          'message' => $lock['message'],
+          'code'    => $lock['code'],
+        ],
+        429
+      );
+    }
 
     $raw_ids            = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
     $offset             = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
@@ -73,7 +95,7 @@ trait PWATG_Bulk_Trait {
     $this->render_view(
       'bulk-page.php',
       [
-
+        'rate_limit_message' => $this->get_rate_limit_notice_text(),
       ]
     );
   }
@@ -84,6 +106,11 @@ trait PWATG_Bulk_Trait {
     }
 
     check_admin_referer( PWATG::AJAX_GENERATE_BULK );
+
+    $lock = $this->get_rate_limit_lock_state();
+    if ( $lock ) {
+      wp_die( esc_html( $lock['message'] ) );
+    }
 
     $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
     $results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing );

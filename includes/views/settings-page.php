@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     <input type="hidden" name="service" value="" />
     <input type="hidden" name="model" value="" />
     <input type="hidden" name="api_key" value="" />
-    <?php wp_nonce_field( PWATG::AJAX_TEST_PROVIDER, PWATG::AJAX_TEST_PROVIDER . '_nonce' ); ?>
+    <?php wp_nonce_field( PWATG::AJAX_TEST_PROVIDER, 'pwatg_test_provider_nonce' ); ?>
     <?php submit_button( __( 'Test Connection', PWATG::TEXT_DOMAIN ), 'secondary', 'pwatg_test_connection_submit', false ); ?>
   </form>
 </div>

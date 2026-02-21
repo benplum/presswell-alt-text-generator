@@ -115,10 +115,46 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
 
       if ( $http_code < 200 || $http_code >= 300 ) {
         $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text' );
-        return new WP_Error( 'pwatg_api_error', $error_message );
+        return self::build_api_error( $http_code, $error_message, $response );
       }
 
       return is_array( $data ) ? $data : [];
+    }
+
+    private static function build_api_error( $http_code, $error_message, $response ) {
+      $code = 'pwatg_api_error';
+      if ( 429 === $http_code ) {
+        $code = 'pwatg_rate_limited';
+      } elseif ( in_array( $http_code, [ 402, 403 ], true ) ) {
+        $code = 'pwatg_quota_exceeded';
+      }
+
+      $data = [
+        'http_code' => $http_code,
+        'provider'  => 'openai',
+      ];
+
+      $retry_after = self::parse_retry_after_header( $response );
+      if ( $retry_after > 0 ) {
+        $data['retry_after'] = $retry_after;
+      }
+
+      return new WP_Error( $code, $error_message, $data );
+    }
+
+    private static function parse_retry_after_header( $response ) {
+      $retry_after = wp_remote_retrieve_header( $response, 'retry-after' );
+      if ( is_array( $retry_after ) ) {
+        $retry_after = end( $retry_after );
+      }
+
+      if ( ! is_scalar( $retry_after ) ) {
+        return 0;
+      }
+
+      $retry_after = trim( (string) $retry_after );
+
+      return ctype_digit( $retry_after ) ? (int) $retry_after : 0;
     }
   }
 }

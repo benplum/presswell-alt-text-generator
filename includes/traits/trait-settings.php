@@ -295,7 +295,7 @@ trait PWATG_Settings_Trait {
       wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
     }
 
-    check_admin_referer( PWATG::AJAX_TEST_PROVIDER, PWATG::AJAX_TEST_PROVIDER . '_nonce' );
+    check_admin_referer( PWATG::AJAX_TEST_PROVIDER, 'pwatg_test_provider_nonce' );
 
     $service = isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '';
     $model   = isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '';

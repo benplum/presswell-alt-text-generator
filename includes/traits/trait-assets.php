@@ -85,6 +85,9 @@ trait PWATG_Assets_Trait {
             'noImages'     => __( 'No matching images found for this run.', PWATG::TEXT_DOMAIN ),
             'running'      => __( 'Running…', PWATG::TEXT_DOMAIN ),
             'failedAlt'    => __( '[Failed to generate]', PWATG::TEXT_DOMAIN ),
+            'rateLimited'  => __( 'Bulk paused due to provider limits. Try again shortly.', PWATG::TEXT_DOMAIN ),
+            'quotaExceeded'=> __( 'Bulk paused because the provider quota was exceeded.', PWATG::TEXT_DOMAIN ),
+            'seeDetails'   => __( 'See failed rows for details.', PWATG::TEXT_DOMAIN ),
           ],
         ]
       );

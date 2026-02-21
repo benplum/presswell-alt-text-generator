@@ -4,6 +4,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 <div class="wrap">
+  <?php wp_nonce_field( PWATG::NONCE_GENERATE_BULK, 'pwatg_bulk_nonce', false ); ?>
+  <?php
+  $rate_limit_message = isset( $rate_limit_message ) ? (string) $rate_limit_message : '';
+  if ( '' !== $rate_limit_message ) :
+    ?>
+    <div class="notice notice-warning">
+      <p><?php echo esc_html( $rate_limit_message ); ?></p>
+    </div>
+  <?php endif; ?>
   <h1>
     <?php echo esc_html__( 'Alt Text Bulk Generator', PWATG::TEXT_DOMAIN ); ?>
   </h1>

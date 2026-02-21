@@ -1,8 +1,8 @@
 jQuery(function($) {
   const data = window.pwatgBulkData || {};
+  const nonceField = document.getElementById('pwatg_bulk_nonce');
   const ajaxAction = data.ajaxAction || 'pwatg_generate_bulk';
   const ajaxInitAction = data.ajaxInitAction || 'pwatg_bulk_init';
-  const nonce = data.nonce || '';
   const i18n = data.i18n || {};
   const startButton = $('#pwatg_start_bulk');
   const progressWrap = $('#pwatg_progress_wrap');
@@ -22,6 +22,27 @@ jQuery(function($) {
 
   function t(key, fallback) {
     return Object.prototype.hasOwnProperty.call(i18n, key) ? i18n[key] : fallback;
+  }
+
+  function getAjaxErrorMessage(jqXHR, fallback) {
+    if (
+      jqXHR &&
+      jqXHR.responseJSON &&
+      jqXHR.responseJSON.data &&
+      jqXHR.responseJSON.data.message
+    ) {
+      return String(jqXHR.responseJSON.data.message);
+    }
+
+    return fallback;
+  }
+
+  function getNonce() {
+    if (nonceField && nonceField.value) {
+      return nonceField.value;
+    }
+
+    return data.nonce || '';
   }
 
   function updateProgress() {
@@ -44,7 +65,32 @@ jQuery(function($) {
       const statusClass = status === 'updated' ? 'pwatg-status-updated' : (status === 'failed' ? 'pwatg-status-failed' : 'pwatg-status-skipped');
       const statusBadge = '<span class="pwatg-status-badge ' + statusClass + '">' + safeStatus + '</span>';
       const altText = item.alt ? String(item.alt) : (item.status === 'failed' ? t('failedAlt', '[Failed to generate]') : '');
-      resultsBody.append('<tr><td>' + thumb + '</td><td>' + mediaId + '</td><td>' + statusBadge + '</td><td>' + $('<div>').text(altText).html() + '</td></tr>');
+      const altHtml = $('<div>').text(altText).html();
+      const errorMessage = item.error_message ? String(item.error_message) : '';
+      const errorCode = item.error_code ? String(item.error_code) : '';
+      let detailHtml = altHtml;
+
+      if (status === 'failed' && errorMessage) {
+        const safeError = $('<div>').text(errorMessage).html();
+        const safeCode = errorCode ? $('<div>').text(errorCode).html() : '';
+        detailHtml += '<div class="pwatg-result-error">';
+        if (safeCode) {
+          detailHtml += '<span class="pwatg-result-error-code">' + safeCode + '</span>';
+        }
+        detailHtml += '<span class="pwatg-result-error-message">' + safeError + '</span>';
+
+        if (item.error_retry_after) {
+          const retrySeconds = parseInt(item.error_retry_after, 10);
+          if (!isNaN(retrySeconds) && retrySeconds > 0) {
+            const minutes = Math.ceil(retrySeconds / 60);
+            detailHtml += '<span class="pwatg-result-error-hint"> · ' + minutes + 'm</span>';
+          }
+        }
+
+        detailHtml += '</div>';
+      }
+
+      resultsBody.append('<tr><td>' + thumb + '</td><td>' + mediaId + '</td><td>' + statusBadge + '</td><td>' + detailHtml + '</td></tr>');
     });
   }
 
@@ -61,7 +107,7 @@ jQuery(function($) {
 
     $.post(ajaxurl, {
       action: ajaxAction,
-      nonce: nonce,
+      nonce: getNonce(),
       ids: ids,
       offset: offset,
       batch_size: batchSize,
@@ -80,14 +126,35 @@ jQuery(function($) {
       appendRows(response.data.items || []);
       updateProgress();
 
+      if (response.data.halted) {
+        const haltCode = response.data.halt_code ? String(response.data.halt_code) : '';
+        const fallback = haltCode === 'pwatg_quota_exceeded'
+          ? t('quotaExceeded', 'Bulk paused because the provider quota was exceeded.')
+          : t('rateLimited', 'Bulk paused due to provider limits. Try again shortly.');
+        let haltMessage = response.data.halt_reason ? String(response.data.halt_reason) : fallback;
+
+        if (response.data.halt_retry_after) {
+          const haltSeconds = parseInt(response.data.halt_retry_after, 10);
+          if (!isNaN(haltSeconds) && haltSeconds > 0) {
+            const minutes = Math.ceil(haltSeconds / 60);
+            haltMessage += ' (' + minutes + 'm)';
+          }
+        }
+
+        haltMessage += ' ' + t('seeDetails', 'See failed rows for details.');
+        finish(haltMessage);
+        return;
+      }
+
       if (response.data.done) {
         finish(t('bulkComplete', 'Bulk generation complete.'));
         return;
       }
 
       runBatch();
-    }).fail(function() {
-      finish(t('bulkFailed', 'Could not complete bulk generation.'));
+    }).fail(function(jqXHR) {
+      const message = getAjaxErrorMessage(jqXHR, t('bulkFailed', 'Could not complete bulk generation.'));
+      finish(message);
     });
   }
 
@@ -101,7 +168,7 @@ jQuery(function($) {
 
     $.post(ajaxurl, {
       action: ajaxInitAction,
-      nonce: nonce,
+      nonce: getNonce(),
       regenerate_existing: regenerateInput.is(':checked') ? 1 : 0
     }).done(function(response) {
       if (!response || !response.success) {
@@ -125,8 +192,9 @@ jQuery(function($) {
 
       startButton.text(t('running', 'Running…'));
       runBatch();
-    }).fail(function() {
-      finish(t('initFailed', 'Could not initialize bulk generation.'));
+    }).fail(function(jqXHR) {
+      const message = getAjaxErrorMessage(jqXHR, t('initFailed', 'Could not initialize bulk generation.'));
+      finish(message);
     });
   });
 });

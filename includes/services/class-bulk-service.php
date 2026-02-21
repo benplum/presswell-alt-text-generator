@@ -60,10 +60,12 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
 
       $batch_ids = array_slice( $ids, $offset, $batch_size );
 
-      $processed = 0;
-      $updated   = 0;
-      $failed    = 0;
-      $items     = [];
+      $processed  = 0;
+      $updated    = 0;
+      $failed     = 0;
+      $items      = [];
+      $halted     = false;
+      $halt_error = null;
 
       foreach ( $batch_ids as $attachment_id ) {
         $processed++;
@@ -73,11 +75,21 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         if ( is_wp_error( $result ) ) {
           $failed++;
           $items[] = [
-            'id'     => $attachment_id,
-            'thumb'  => $thumb,
-            'alt'    => '',
-            'status' => 'failed',
+            'id'                => $attachment_id,
+            'thumb'             => $thumb,
+            'alt'               => '',
+            'status'            => 'failed',
+            'error_code'        => sanitize_key( $result->get_error_code() ),
+            'error_message'     => sanitize_text_field( $result->get_error_message() ),
+            'error_retry_after' => $this->extract_retry_after_from_error( $result ),
           ];
+
+          if ( $this->is_rate_limit_wp_error( $result ) ) {
+            $halted     = true;
+            $halt_error = $result;
+            break;
+          }
+
           continue;
         }
 
@@ -92,16 +104,25 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         }
       }
 
-      $next_offset = $offset + count( $batch_ids );
+      $next_offset = $offset + $processed;
 
-      return [
+      $response = [
         'processed'   => $processed,
         'updated'     => $updated,
         'failed'      => $failed,
         'items'       => $items,
         'next_offset' => $next_offset,
-        'done'        => $next_offset >= $total,
+        'done'        => $halted ? true : ( $next_offset >= $total ),
+        'halted'      => $halted,
       ];
+
+      if ( $halted ) {
+        $response['halt_code']        = sanitize_key( $halt_error ? $halt_error->get_error_code() : '' );
+        $response['halt_reason']      = $halt_error ? sanitize_text_field( $halt_error->get_error_message() ) : '';
+        $response['halt_retry_after'] = $halt_error ? $this->extract_retry_after_from_error( $halt_error ) : 0;
+      }
+
+      return $response;
     }
 
     public function run_bulk_generation( $regenerate_existing ) {
@@ -116,6 +137,9 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, $regenerate_existing );
         if ( is_wp_error( $result ) ) {
           $failed++;
+          if ( $this->is_rate_limit_wp_error( $result ) ) {
+            break;
+          }
           continue;
         }
         if ( $result ) {
@@ -137,6 +161,33 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       }
 
       return $thumb ? esc_url_raw( $thumb ) : '';
+    }
+
+    protected function extract_retry_after_from_error( $error ) {
+      if ( ! ( $error instanceof WP_Error ) ) {
+        return 0;
+      }
+
+      $data = $error->get_error_data();
+      if ( is_array( $data ) ) {
+        if ( isset( $data['remaining'] ) ) {
+          return max( 0, (int) $data['remaining'] );
+        }
+
+        if ( isset( $data['retry_after'] ) ) {
+          return max( 0, (int) $data['retry_after'] );
+        }
+      }
+
+      return 0;
+    }
+
+    protected function is_rate_limit_wp_error( $error ) {
+      if ( ! ( $error instanceof WP_Error ) ) {
+        return false;
+      }
+
+      return in_array( $error->get_error_code(), [ 'pwatg_rate_limited', 'pwatg_quota_exceeded' ], true );
     }
   }
 }
