@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-trait PWATG_View_Helpers_Trait {
+trait PWATG_View_Helper_Trait {
 	protected function render_view( $relative_path, array $context = [] ) {
 		$view_path = $this->get_plugin_path( 'includes/views/' . ltrim( $relative_path, '/' ) );
 		if ( ! file_exists( $view_path ) ) {

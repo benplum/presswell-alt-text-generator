@@ -27,11 +27,11 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
 				$args['meta_query'] = [
 					'relation' => 'OR',
 					[
-						'key'     => Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY,
+						'key'     => PWATG::ALT_TEXT_META_KEY,
 						'compare' => 'NOT EXISTS',
 					],
 					[
-						'key'     => Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY,
+						'key'     => PWATG::ALT_TEXT_META_KEY,
 						'value'   => '',
 						'compare' => '=',
 					],
@@ -86,7 +86,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
 					$items[] = [
 						'id'     => $attachment_id,
 						'thumb'  => $thumb,
-						'alt'    => (string) get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true ),
+						'alt'    => (string) get_post_meta( $attachment_id, PWATG::ALT_TEXT_META_KEY, true ),
 						'status' => 'updated',
 					];
 				}

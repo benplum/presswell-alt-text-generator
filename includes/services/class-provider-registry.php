@@ -26,7 +26,7 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
 
 		private static function resolve( $service ) {
 			$service = sanitize_key( (string) $service );
-			$map     = Presswell_Alt_Text_Generator::PROVIDER_MAP;
+			$map     = PWATG::PROVIDER_MAP;
 
 			$map = apply_filters( 'pwatg_provider_registry', $map );
 
@@ -34,7 +34,7 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
 				return $map[ $service ];
 			}
 
-			return isset( $map['openai'] ) ? $map['openai'] : 'PWATG_OpenAI_Service';
+			return isset( $map[ PWATG::PROVIDER_OPENAI ] ) ? $map[ PWATG::PROVIDER_OPENAI ] : 'PWATG_OpenAI_Service';
 		}
 	}
 }

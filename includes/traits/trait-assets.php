@@ -6,8 +6,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait PWATG_Assets_Trait {
 	public function enqueue_admin_assets( $hook_suffix ) {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! is_admin() ) {
 			return;
 		}
@@ -42,7 +40,7 @@ trait PWATG_Assets_Trait {
 				'pwatg-js-settings',
 				'pwatgSettingsData',
 				[
-					'optionKey'    => '',
+					'optionKey'    => PWATG::SETTINGS_KEY,
 					'modelMap'     => $model_map,
 					'currentModel' => (string) $settings['model'],
 				]
@@ -69,18 +67,18 @@ trait PWATG_Assets_Trait {
 				'pwatg-js-bulk',
 				'pwatgBulkData',
 				[
-					'nonce' => wp_create_nonce( 'pwatg_bulk_ajax' ),
+					'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
 					'i18n'  => [
-						'runBulk'      => __( 'Run Bulk Generation', $text_domain ),
-						'bulkComplete' => __( 'Bulk generation complete.', $text_domain ),
-						'batchFailed'  => __( 'Batch request failed.', $text_domain ),
-						'bulkFailed'   => __( 'Could not complete bulk generation.', $text_domain ),
-						'preparing'    => __( 'Preparing…', $text_domain ),
-						'preparingList'=> __( 'Preparing image list…', $text_domain ),
-						'initFailed'   => __( 'Could not initialize bulk generation.', $text_domain ),
-						'noImages'     => __( 'No matching images found for this run.', $text_domain ),
-						'running'      => __( 'Running…', $text_domain ),
-						'failedAlt'    => __( '[Failed to generate]', $text_domain ),
+						'runBulk'      => __( 'Run Bulk Generation', PWATG::TEXT_DOMAIN ),
+						'bulkComplete' => __( 'Bulk generation complete.', PWATG::TEXT_DOMAIN ),
+						'batchFailed'  => __( 'Batch request failed.', PWATG::TEXT_DOMAIN ),
+						'bulkFailed'   => __( 'Could not complete bulk generation.', PWATG::TEXT_DOMAIN ),
+						'preparing'    => __( 'Preparing…', PWATG::TEXT_DOMAIN ),
+						'preparingList'=> __( 'Preparing image list…', PWATG::TEXT_DOMAIN ),
+						'initFailed'   => __( 'Could not initialize bulk generation.', PWATG::TEXT_DOMAIN ),
+						'noImages'     => __( 'No matching images found for this run.', PWATG::TEXT_DOMAIN ),
+						'running'      => __( 'Running…', PWATG::TEXT_DOMAIN ),
+						'failedAlt'    => __( '[Failed to generate]', PWATG::TEXT_DOMAIN ),
 					],
 				]
 			);
@@ -95,12 +93,12 @@ trait PWATG_Assets_Trait {
 			if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
 				$inline_url     = $this->get_single_action_url( $current_post_id );
 				$inline_last    = $this->get_last_generated_label( $current_post_id );
-				$inline_current = (string) get_post_meta( $current_post_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+				$inline_current = (string) get_post_meta( $current_post_id, PWATG::ALT_TEXT_META_KEY, true );
 				$inline_has_alt = '' !== trim( $inline_current );
 			}
 
 			wp_enqueue_script(
-				'pwatg-jsmedia',
+				'pwatg-js-media',
 				$this->get_asset_url( 'js/media.js' ),
 				[ 'jquery' ],
 				$this->get_asset_version(),
@@ -116,15 +114,15 @@ trait PWATG_Assets_Trait {
 					'inlineHasAlt' => $inline_has_alt,
 					'ajaxAction' => 'pwatg_generate_single',
 					'strings'    => [
-						'generateButton'    => __( 'Generate Alt Text', $text_domain ),
-						'generatingButton'  => __( 'Generating...', $text_domain ),
-						'regenerateButton'  => __( 'Regenerate Alt Text', $text_domain ),
-						'lastGeneratedLabel'=> __( 'Last generated:', $text_domain ),
-						'never'             => __( 'Never', $text_domain ),
-						'updated'           => __( 'Alt text generated successfully.', $text_domain ),
-						'skipped'           => __( 'No changes were needed for this image.', $text_domain ),
-						'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings.', $text_domain ),
-						'error'             => __( 'Could not generate alt text for this image.', $text_domain ),
+						'generateButton'    => __( 'Generate Alt Text', PWATG::TEXT_DOMAIN ),
+						'generatingButton'  => __( 'Generating...', PWATG::TEXT_DOMAIN ),
+						'regenerateButton'  => __( 'Regenerate Alt Text', PWATG::TEXT_DOMAIN ),
+						'lastGeneratedLabel'=> __( 'Last generated:', PWATG::TEXT_DOMAIN ),
+						'never'             => __( 'Never', PWATG::TEXT_DOMAIN ),
+						'updated'           => __( 'Alt text generated successfully.', PWATG::TEXT_DOMAIN ),
+						'skipped'           => __( 'No changes were needed for this image.', PWATG::TEXT_DOMAIN ),
+						'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ),
+						'error'             => __( 'Could not generate alt text for this image.', PWATG::TEXT_DOMAIN ),
 					],
 				]
 			);
@@ -134,16 +132,16 @@ trait PWATG_Assets_Trait {
 	private function is_settings_page( $hook_suffix ) {
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
-		return $this->get_settings_screen_id() === $hook_suffix && $this->get_settings_page_slug() === $page;
+		return PWATG::SETTINGS_PAGE_SCREEN_ID === $hook_suffix && PWATG::SETTINGS_PAGE_SLUG === $page;
 	}
 
 	private function get_asset_version() {
-		return (string) Presswell_Alt_Text_Generator::VERSION;
+		return (string) PWATG::VERSION;
 	}
 
 	private function is_bulk_page( $hook_suffix ) {
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
-		return $this->get_bulk_screen_id() === $hook_suffix && $this->get_bulk_page_slug() === $page;
+		return PWATG::BULK_PAGE_SCREEN_ID === $hook_suffix && PWATG::BULK_PAGE_SLUG === $page;
 	}
 }

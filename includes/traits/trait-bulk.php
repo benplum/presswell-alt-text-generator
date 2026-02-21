@@ -6,13 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait PWATG_Bulk_Trait {
 	public function handle_bulk_init_ajax() {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
 		}
 
-		check_ajax_referer( 'pwatg_bulk_ajax', 'nonce' );
+		check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
 
 		$regenerate_existing = ! empty( $_POST['regenerate_existing'] );
 		$ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing );
@@ -26,13 +24,11 @@ trait PWATG_Bulk_Trait {
 	}
 
 	public function handle_bulk_generate_ajax() {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
 		}
 
-		check_ajax_referer( 'pwatg_bulk_ajax', 'nonce' );
+		check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
 
 		$raw_ids            = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
 		$offset             = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
@@ -60,16 +56,14 @@ trait PWATG_Bulk_Trait {
 		$this->render_view(
 			'bulk-page.php',
 			[
-				'text_domain' => $this->get_text_domain(),
+
 			]
 		);
 	}
 
 	public function handle_bulk_generation() {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		check_admin_referer( 'pwatg_run_bulk' );
@@ -78,7 +72,7 @@ trait PWATG_Bulk_Trait {
 		$results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing );
 
 		set_transient(
-			Presswell_Alt_Text_Generator::NOTICE_KEY,
+			PWATG::BULK_NOTICE_KEY,
 			[
 				'processed' => $results['processed'],
 				'updated'   => $results['updated'],
@@ -87,7 +81,7 @@ trait PWATG_Bulk_Trait {
 			60
 		);
 
-		wp_safe_redirect( $this->get_bulk_page_url() );
+		wp_safe_redirect( PWATG::BULK_PAGE_URL );
 		exit;
 	}
 }

@@ -10,14 +10,12 @@ trait PWATG_Providers_Trait {
 	}
 
 	public function generate_alt_text_for_attachment( $attachment_id, $force_regenerate = false ) {
-		$text_domain = $this->get_text_domain();
-
 		$attachment_id = absint( $attachment_id );
 		if ( ! $attachment_id || ! wp_attachment_is_image( $attachment_id ) ) {
-			return new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', $text_domain ) );
+			return new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', PWATG::TEXT_DOMAIN ) );
 		}
 
-		$current_alt = trim( (string) get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true ) );
+		$current_alt = trim( (string) get_post_meta( $attachment_id, PWATG::ALT_TEXT_META_KEY, true ) );
 		if ( ! $force_regenerate && '' !== $current_alt ) {
 			return false;
 		}
@@ -26,17 +24,17 @@ trait PWATG_Providers_Trait {
 
 		$file_path = get_attached_file( $attachment_id );
 		if ( ! $file_path || ! file_exists( $file_path ) ) {
-			return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', $text_domain ) );
+			return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		$file_size = filesize( $file_path );
 		if ( false === $file_size || $file_size > 5 * 1024 * 1024 ) {
-			return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', $text_domain ) );
+			return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		$image_binary = file_get_contents( $file_path );
 		if ( false === $image_binary ) {
-			return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', $text_domain ) );
+			return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		$mime_type = get_post_mime_type( $attachment_id );
@@ -46,7 +44,7 @@ trait PWATG_Providers_Trait {
 
 		$prompt = sprintf(
 			/* translators: %s: filename */
-			__( 'Filename context: %s. Return only the alt text with no quotes.', $text_domain ),
+			__( 'Filename context: %s. Return only the alt text with no quotes.', PWATG::TEXT_DOMAIN ),
 			basename( $file_path )
 		);
 
@@ -61,7 +59,7 @@ trait PWATG_Providers_Trait {
 		$model       = isset( $settings['model'] ) ? trim( (string) $settings['model'] ) : '';
 
 		if ( '' === $model ) {
-			return new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', $text_domain ) );
+			return new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		$api_key = '';
@@ -74,7 +72,7 @@ trait PWATG_Providers_Trait {
 		}
 
 		if ( '' === $api_key ) {
-			return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', $text_domain ) );
+			return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		$alt_text = PWATG_Provider_Registry::request_alt_text( $service, $api_key, $model, $full_prompt, $mime_type, $image_binary );
@@ -85,15 +83,15 @@ trait PWATG_Providers_Trait {
 
 		$alt_text = sanitize_text_field( $alt_text );
 		if ( '' === $alt_text ) {
-			return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', $text_domain ) );
+			return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		if ( mb_strlen( $alt_text ) > 220 ) {
 			$alt_text = mb_substr( $alt_text, 0, 220 );
 		}
 
-		update_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, $alt_text );
-		update_post_meta( $attachment_id, Presswell_Alt_Text_Generator::LAST_GENERATED_META_KEY, (string) current_time( 'timestamp', true ) );
+		update_post_meta( $attachment_id, PWATG::ALT_TEXT_META_KEY, $alt_text );
+		update_post_meta( $attachment_id, PWATG::LAST_GENERATED_META_KEY, (string) current_time( 'timestamp', true ) );
 
 		return true;
 	}

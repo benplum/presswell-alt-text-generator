@@ -4,11 +4,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 <div class="wrap">
-	<h1><?php echo esc_html__( 'Alt Text Generator', $text_domain ); ?></h1>
+	<h1><?php echo esc_html__( 'Alt Text Generator', PWATG::TEXT_DOMAIN ); ?></h1>
 	<form method="post" action="options.php">
 		<?php
 		settings_fields( 'pwatg_settings_group' );
-		do_settings_sections( $text_domain );
+		do_settings_sections( PWATG::SETTINGS_PAGE_SLUG );
 		submit_button();
 		?>
 	</form>
@@ -19,6 +19,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<input type="hidden" name="model" value="" />
 		<input type="hidden" name="api_key" value="" />
 		<?php wp_nonce_field( $test_connection_nonce_action, 'pwatg_test_connection_nonce' ); ?>
-		<?php submit_button( __( 'Test Connection', $text_domain ), 'secondary', 'pwatg_test_connection_submit', false ); ?>
+		<?php submit_button( __( 'Test Connection', PWATG::TEXT_DOMAIN ), 'secondary', 'pwatg_test_connection_submit', false ); ?>
 	</form>
 </div>

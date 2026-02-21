@@ -6,11 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait PWATG_Settings_Trait {
 	public function register_settings() {
-		$text_domain = $this->get_text_domain();
-
 		register_setting(
 			'pwatg_settings_group',
-			'pwatg_options',
+			PWATG::SETTINGS_KEY,
 			[
 				'type'              => 'array',
 				'sanitize_callback' => [ $this, 'sanitize_settings' ],
@@ -20,48 +18,48 @@ trait PWATG_Settings_Trait {
 
 		add_settings_section(
 			'pwatg_main_section',
-			__( 'Settings', $text_domain ),
+			__( 'Settings', PWATG::TEXT_DOMAIN ),
 			'__return_false',
-			$text_domain
+			PWATG::SETTINGS_PAGE_SLUG
 		);
 
 		add_settings_field(
 			'service',
-			__( 'AI Service', $text_domain ),
+			__( 'AI Service', PWATG::TEXT_DOMAIN ),
 			[ $this, 'render_service_field' ],
-			$text_domain,
+			PWATG::SETTINGS_PAGE_SLUG,
 			'pwatg_main_section'
 		);
 
 		add_settings_field(
 			'api_key',
-			__( 'API Key', $text_domain ),
+			__( 'API Key', PWATG::TEXT_DOMAIN ),
 			[ $this, 'render_api_key_field' ],
-			$text_domain,
+			PWATG::SETTINGS_PAGE_SLUG,
 			'pwatg_main_section'
 		);
 
 		add_settings_field(
 			'model',
-			__( 'Model', $text_domain ),
+			__( 'Model', PWATG::TEXT_DOMAIN ),
 			[ $this, 'render_model_field' ],
-			$text_domain,
+			PWATG::SETTINGS_PAGE_SLUG,
 			'pwatg_main_section'
 		);
 
 		add_settings_field(
 			'prompt_seed',
-			__( 'Prompt', $text_domain ),
+			__( 'Prompt', PWATG::TEXT_DOMAIN ),
 			[ $this, 'render_prompt_seed_field' ],
-			$text_domain,
+			PWATG::SETTINGS_PAGE_SLUG,
 			'pwatg_main_section'
 		);
 
 		add_settings_field(
 			'auto_generate',
-			__( 'Generate on Upload', $text_domain ),
+			__( 'Generate on Upload', PWATG::TEXT_DOMAIN ),
 			[ $this, 'render_auto_generate_field' ],
-			$text_domain,
+			PWATG::SETTINGS_PAGE_SLUG,
 			'pwatg_main_section'
 		);
 	}
@@ -116,7 +114,7 @@ trait PWATG_Settings_Trait {
 
 	public function get_settings() {
 		$defaults = $this->get_default_settings();
-		$settings = wp_parse_args( get_option( 'pwatg_options', [] ), $defaults );
+		$settings = wp_parse_args( get_option( PWATG::SETTINGS_KEY, [] ), $defaults );
 
 		if ( ! isset( $settings['api_keys'] ) || ! is_array( $settings['api_keys'] ) ) {
 			$settings['api_keys'] = $defaults['api_keys'];
@@ -150,16 +148,14 @@ trait PWATG_Settings_Trait {
 	}
 
 	public function get_available_services() {
-		$text_domain = $this->get_text_domain();
-
 		$labels = [
-			'openai'    => __( 'OpenAI', $text_domain ),
-			'anthropic' => __( 'Anthropic', $text_domain ),
-			'gemini'    => __( 'Google Gemini', $text_domain ),
+			'openai'    => __( 'OpenAI', PWATG::TEXT_DOMAIN ),
+			'anthropic' => __( 'Anthropic', PWATG::TEXT_DOMAIN ),
+			'gemini'    => __( 'Google Gemini', PWATG::TEXT_DOMAIN ),
 		];
 
 		$services = [];
-		foreach ( array_keys( Presswell_Alt_Text_Generator::PROVIDER_MAP ) as $service_key ) {
+		foreach ( array_keys( PWATG::PROVIDER_MAP ) as $service_key ) {
 			$services[ $service_key ] = isset( $labels[ $service_key ] )
 				? $labels[ $service_key ]
 				: ucwords( str_replace( '-', ' ', $service_key ) );
@@ -186,7 +182,7 @@ trait PWATG_Settings_Trait {
 			],
 		];
 
-		$provider_keys = array_keys( Presswell_Alt_Text_Generator::PROVIDER_MAP );
+		$provider_keys = array_keys( PWATG::PROVIDER_MAP );
 		$map           = array_intersect_key( $all_models, array_flip( $provider_keys ) );
 
 		if ( empty( $map ) ) {
@@ -205,7 +201,7 @@ trait PWATG_Settings_Trait {
 		$settings = $this->get_settings();
 		$services = $this->get_available_services();
 		?>
-		<select name="<?php echo esc_attr( 'pwatg_settings' ); ?>[service]">
+		<select name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[service]">
 			<?php foreach ( $services as $value => $label ) : ?>
 				<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['service'], $value ); ?>>
 					<?php echo esc_html( $label ); ?>
@@ -216,8 +212,6 @@ trait PWATG_Settings_Trait {
 	}
 
 	public function render_api_key_field() {
-		$text_domain = $this->get_text_domain();
-
 		$settings = $this->get_settings();
 		$services = $this->get_available_services();
 		$current  = isset( $settings['service'] ) ? sanitize_key( $settings['service'] ) : 'openai';
@@ -230,7 +224,7 @@ trait PWATG_Settings_Trait {
 			<div class="pwatg-api-key-wrap <?php echo $current === $service ? '' : 'is-hidden'; ?>" data-service="<?php echo esc_attr( $service ); ?>">
 				<input
 					type="password"
-					name="<?php echo esc_attr( 'pwatg_settings' ); ?>[api_keys][<?php echo esc_attr( $service ); ?>]"
+					name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[api_keys][<?php echo esc_attr( $service ); ?>]"
 					value="<?php echo esc_attr( $value ); ?>"
 					class="regular-text"
 					autocomplete="off"
@@ -240,7 +234,7 @@ trait PWATG_Settings_Trait {
 					echo esc_html(
 						sprintf(
 							/* translators: %s: AI service name */
-								__( 'API key for %s.', $text_domain ),
+								__( 'API key for %s.', PWATG::TEXT_DOMAIN ),
 							$label
 						)
 					);
@@ -256,7 +250,7 @@ trait PWATG_Settings_Trait {
 		$models   = $this->get_available_models( $settings['service'] );
 		$model    = (string) $settings['model'];
 		?>
-		<select name="<?php echo esc_attr( 'pwatg_settings' ); ?>[model]">
+		<select name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[model]">
 			<?php foreach ( $models as $value => $label ) : ?>
 				<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $model, $value ); ?>>
 					<?php echo esc_html( $label ); ?>
@@ -267,23 +261,19 @@ trait PWATG_Settings_Trait {
 	}
 
 	public function render_prompt_seed_field() {
-		$text_domain = $this->get_text_domain();
-
 		$settings = $this->get_settings();
 		?>
-		<textarea name="<?php echo esc_attr( 'pwatg_settings' ); ?>[prompt_seed]" rows="4" cols="50" class="large-text"><?php echo esc_textarea( $settings['prompt_seed'] ); ?></textarea>
-		<p class="description"><?php echo esc_html__( 'Base instruction prepended to each request. Keep it concise and accessibility-focused.', $text_domain ); ?></p>
+		<textarea name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[prompt_seed]" rows="4" cols="50" class="large-text"><?php echo esc_textarea( $settings['prompt_seed'] ); ?></textarea>
+		<p class="description"><?php echo esc_html__( 'Base instruction prepended to each request. Keep it concise and accessibility-focused.', PWATG::TEXT_DOMAIN ); ?></p>
 		<?php
 	}
 
 	public function render_auto_generate_field() {
-		$text_domain = $this->get_text_domain();
-
 		$settings = $this->get_settings();
 		?>
 		<label>
-			<input type="checkbox" name="<?php echo esc_attr( 'pwatg_settings' ); ?>[auto_generate]" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?> />
-			<?php echo esc_html__( 'Generate alt text automatically when an image is uploaded.', $text_domain ); ?>
+			<input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[auto_generate]" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?> />
+			<?php echo esc_html__( 'Generate alt text automatically when an image is uploaded.', PWATG::TEXT_DOMAIN ); ?>
 		</label>
 		<?php
 	}
@@ -295,7 +285,7 @@ trait PWATG_Settings_Trait {
 		$this->render_view(
 			'settings-page.php',
 			[
-				'text_domain' => 'presswell-alt-text',
+
 				'test_connection_action' => 'pwatg_test_connection',
 				'test_connection_nonce_action' => 'pwatg_test_connection',
 			]
@@ -303,10 +293,8 @@ trait PWATG_Settings_Trait {
 	}
 
 	public function handle_test_connection() {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
 		}
 
 		check_admin_referer( 'pwatg_test_connection', 'pwatg_test_connection_nonce' );
@@ -317,15 +305,15 @@ trait PWATG_Settings_Trait {
 
 		if ( '' === $service || '' === $model || '' === $api_key ) {
 			set_transient(
-				Presswell_Alt_Text_Generator::TEST_NOTICE_KEY,
+				PWATG::TEST_NOTICE_KEY,
 				[
 					'type'    => 'error',
-					'message' => __( 'Service, model, and API key are required to test the connection.', $text_domain ),
+					'message' => __( 'Service, model, and API key are required to test the connection.', PWATG::TEXT_DOMAIN ),
 				],
 				60
 			);
 
-			wp_safe_redirect( $this->get_settings_page_url() );
+			wp_safe_redirect( PWATG::SETTINGS_PAGE_URL );
 			exit;
 		}
 
@@ -333,12 +321,12 @@ trait PWATG_Settings_Trait {
 
 		if ( is_wp_error( $result ) ) {
 			set_transient(
-				Presswell_Alt_Text_Generator::TEST_NOTICE_KEY,
+				PWATG::TEST_NOTICE_KEY,
 				[
 					'type'    => 'error',
 					'message' => sprintf(
 						/* translators: %s: provider error message */
-						__( 'Connection failed: %s', $text_domain ),
+						__( 'Connection failed: %s', PWATG::TEXT_DOMAIN ),
 						$result->get_error_message()
 					),
 				],
@@ -350,17 +338,17 @@ trait PWATG_Settings_Trait {
 				$response_text = mb_substr( $response_text, 0, 120 ) . '…';
 			}
 
-			$message = __( 'Connection successful.', $text_domain );
+			$message = __( 'Connection successful.', PWATG::TEXT_DOMAIN );
 			if ( '' !== $response_text ) {
 				$message = sprintf(
 					/* translators: %s: provider response text */
-					__( 'Connection successful. Response: %s', $text_domain ),
+					__( 'Connection successful. Response: %s', PWATG::TEXT_DOMAIN ),
 					$response_text
 				);
 			}
 
 			set_transient(
-				Presswell_Alt_Text_Generator::TEST_NOTICE_KEY,
+				PWATG::TEST_NOTICE_KEY,
 				[
 					'type'    => 'success',
 					'message' => $message,
@@ -369,7 +357,7 @@ trait PWATG_Settings_Trait {
 			);
 		}
 
-		wp_safe_redirect( $this->get_settings_page_url() );
+		wp_safe_redirect( PWATG::SETTINGS_PAGE_URL );
 		exit;
 	}
 }

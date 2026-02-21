@@ -6,15 +6,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait PWATG_Media_Trait {
 	public function add_media_row_action( $actions, $post ) {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! wp_attachment_is_image( $post->ID ) ) {
 			return $actions;
 		}
 
 		if ( current_user_can( 'upload_files' ) && current_user_can( 'edit_post', $post->ID ) ) {
 			$url         = $this->get_single_action_url( $post->ID );
-			$current_alt = (string) get_post_meta( $post->ID, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+			$current_alt = (string) get_post_meta( $post->ID, PWATG::ALT_TEXT_META_KEY, true );
 			$has_alt     = '' !== trim( $current_alt );
 			$actions['pwatg_generate_alt'] = $this->render_view_to_string(
 				'media-row-action.php',
@@ -22,8 +20,8 @@ trait PWATG_Media_Trait {
 					'url' => $url,
 					'attachment_id' => (int) $post->ID,
 					'has_alt' => $has_alt,
-					'button_label' => $has_alt ? __( 'Regenerate Alt Text', $text_domain ) : __( 'Generate Alt Text', $text_domain ),
-					'text_domain' => $text_domain,
+					'button_label' => $has_alt ? __( 'Regenerate Alt Text', PWATG::TEXT_DOMAIN ) : __( 'Generate Alt Text', PWATG::TEXT_DOMAIN ),
+
 				]
 			);
 		}
@@ -32,8 +30,6 @@ trait PWATG_Media_Trait {
 	}
 
 	public function add_media_modal_action_field( $form_fields, $post ) {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $post->ID ) ) {
 			return $form_fields;
 		}
@@ -44,11 +40,11 @@ trait PWATG_Media_Trait {
 
 		$url            = $this->get_single_action_url( $post->ID );
 		$last_generated = $this->get_last_generated_label( $post->ID );
-		$current_alt    = (string) get_post_meta( $post->ID, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+		$current_alt    = (string) get_post_meta( $post->ID, PWATG::ALT_TEXT_META_KEY, true );
 		$has_alt        = '' !== trim( $current_alt );
 
 		$form_fields['pwatg_generate_alt'] = [
-			'label' => __( 'Alt Text Generator', $text_domain ),
+			'label' => __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),
 			'input' => 'html',
 			'html'  => $this->render_view_to_string(
 				'media-modal-action.php',
@@ -56,12 +52,12 @@ trait PWATG_Media_Trait {
 					'url'            => $url,
 					'attachment_id'  => (int) $post->ID,
 					'has_alt'        => $has_alt,
-					'button_label'   => $has_alt ? __( 'Regenerate Alt Text', $text_domain ) : __( 'Generate Alt Text', $text_domain ),
+					'button_label'   => $has_alt ? __( 'Regenerate Alt Text', PWATG::TEXT_DOMAIN ) : __( 'Generate Alt Text', PWATG::TEXT_DOMAIN ),
 					'last_generated' => $last_generated,
-					'text_domain'    => $text_domain,
+
 				]
 			),
-			'helps' => __( 'Runs AI alt text generation for this image.', $text_domain ),
+			'helps' => __( 'Runs AI alt text generation for this image.', PWATG::TEXT_DOMAIN ),
 		];
 
 		if ( isset( $form_fields['image_alt'] ) ) {
@@ -104,7 +100,7 @@ trait PWATG_Media_Trait {
 			return;
 		}
 
-		$current_alt = get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+		$current_alt = get_post_meta( $attachment_id, PWATG::ALT_TEXT_META_KEY, true );
 		if ( ! empty( $current_alt ) ) {
 			return;
 		}
@@ -113,15 +109,13 @@ trait PWATG_Media_Trait {
 	}
 
 	public function handle_single_generation() {
-		$text_domain = $this->get_text_domain();
-
 		$attachment_id = isset( $_REQUEST['attachment_id'] ) ? absint( $_REQUEST['attachment_id'] ) : 0;
 
 		if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', $text_domain ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
 		}
 
-		check_admin_referer( 'pwtag_generate_single_' . $attachment_id );
+		check_admin_referer( PWATG::NONCE_GENERATE_SINGLE . $attachment_id );
 
 		$result = $this->generate_alt_text_for_attachment( $attachment_id, true );
 		$status = 'error';
@@ -152,15 +146,13 @@ trait PWATG_Media_Trait {
 	}
 
 	public function handle_single_generation_ajax() {
-		$text_domain = $this->get_text_domain();
-
 		$attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
 
 		if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
-			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', $text_domain ) ], 403 );
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
 		}
 
-		check_ajax_referer( 'pwatg_generate_single_' . $attachment_id, 'nonce' );
+		check_ajax_referer( PWATG::NONCE_GENERATE_SINGLE . $attachment_id, 'nonce' );
 
 		$result = $this->generate_alt_text_for_attachment( $attachment_id, true );
 		$status = 'error';
@@ -174,20 +166,20 @@ trait PWATG_Media_Trait {
 		}
 
 		$messages = [
-			'updated'     => __( 'Alt text generated successfully.', $text_domain ),
-			'skipped'     => __( 'No changes were needed for this image.', $text_domain ),
-			'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', $text_domain ),
-			'error'       => __( 'Could not generate alt text for this image.', $text_domain ),
+			'updated'     => __( 'Alt text generated successfully.', PWATG::TEXT_DOMAIN ),
+			'skipped'     => __( 'No changes were needed for this image.', PWATG::TEXT_DOMAIN ),
+			'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ),
+			'error'       => __( 'Could not generate alt text for this image.', PWATG::TEXT_DOMAIN ),
 		];
 
-		$alt_text       = (string) get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::ALT_TEXT_META_KEY, true );
+		$alt_text       = (string) get_post_meta( $attachment_id, PWATG::ALT_TEXT_META_KEY, true );
 		$last_generated = $this->get_last_generated_label( $attachment_id );
 
 		if ( in_array( $status, [ 'error', 'missing_key' ], true ) ) {
 			wp_send_json_error(
 				[
 					'status'         => $status,
-					'message'        => isset( $messages[ $status ] ) ? $messages[ $status ] : __( 'Could not generate alt text for this image.', $text_domain ),
+					'message'        => isset( $messages[ $status ] ) ? $messages[ $status ] : __( 'Could not generate alt text for this image.', PWATG::TEXT_DOMAIN ),
 					'attachment_id'  => $attachment_id,
 					'alt_text'       => $alt_text,
 					'last_generated' => $last_generated,
@@ -212,17 +204,15 @@ trait PWATG_Media_Trait {
 
 		return wp_nonce_url(
 			admin_url( 'admin-post.php?action=pwatg_generate_single&attachment_id=' . $attachment_id ),
-			'pwatg_generate_single_' . $attachment_id
+			PWATG::NONCE_GENERATE_SINGLE . $attachment_id
 		);
 	}
 
 	public function get_last_generated_label( $attachment_id ) {
-		$text_domain = $this->get_text_domain();
-
-		$raw = (string) get_post_meta( $attachment_id, Presswell_Alt_Text_Generator::LAST_GENERATED_META_KEY, true );
+		$raw = (string) get_post_meta( $attachment_id, PWATG::LAST_GENERATED_META_KEY, true );
 
 		if ( '' === trim( $raw ) ) {
-			return __( 'Never', $text_domain );
+			return __( 'Never', PWATG::TEXT_DOMAIN );
 		}
 
 		$raw       = trim( $raw );
@@ -243,19 +233,17 @@ trait PWATG_Media_Trait {
 		}
 
 		if ( false === $timestamp || $timestamp <= 0 ) {
-			return __( 'Unknown', $text_domain );
+			return __( 'Unknown', PWATG::TEXT_DOMAIN );
 		}
 
 		return sprintf(
 			/* translators: %s: localized datetime */
-			__( '%s', $text_domain ),
+			__( '%s', PWATG::TEXT_DOMAIN ),
 			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp )
 		);
 	}
 
 	public function render_admin_notices() {
-		$text_domain = $this->get_text_domain();
-
 		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 			if ( ! current_user_can( 'upload_files' ) ) {
 				return;
@@ -267,10 +255,10 @@ trait PWATG_Media_Trait {
 			$attachment = isset( $_GET['pwatg_attachment'] ) ? absint( $_GET['pwatg_attachment'] ) : 0;
 
 			$messages = [
-				'updated'     => __( 'Alt text generated successfully.', $text_domain ),
-				'skipped'     => __( 'No changes were needed for this image.', $text_domain ),
-				'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', $text_domain ),
-				'error'       => __( 'Could not generate alt text for this image.', $text_domain ),
+				'updated'     => __( 'Alt text generated successfully.', PWATG::TEXT_DOMAIN ),
+				'skipped'     => __( 'No changes were needed for this image.', PWATG::TEXT_DOMAIN ),
+				'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ),
+				'error'       => __( 'Could not generate alt text for this image.', PWATG::TEXT_DOMAIN ),
 			];
 
 			if ( isset( $messages[ $status ] ) ) {
@@ -280,7 +268,7 @@ trait PWATG_Media_Trait {
 				if ( $attachment > 0 ) {
 					$text .= ' ' . sprintf(
 						/* translators: %d: attachment ID */
-						__( 'Attachment ID: %d.', $text_domain ),
+						__( 'Attachment ID: %d.', PWATG::TEXT_DOMAIN ),
 						$attachment
 					);
 				}
@@ -294,10 +282,10 @@ trait PWATG_Media_Trait {
 			}
 		}
 
-		if ( ! empty( $_GET['page'] ) && $this->get_settings_page_slug() === $_GET['page'] ) {
-			$test_notice = get_transient( Presswell_Alt_Text_Generator::TEST_NOTICE_KEY );
+		if ( ! empty( $_GET['page'] ) && PWATG::SETTINGS_PAGE_SLUG === $_GET['page'] ) {
+			$test_notice = get_transient( PWATG::TEST_NOTICE_KEY );
 			if ( is_array( $test_notice ) && isset( $test_notice['message'] ) ) {
-				delete_transient( Presswell_Alt_Text_Generator::TEST_NOTICE_KEY );
+				delete_transient( PWATG::TEST_NOTICE_KEY );
 				$class = ( isset( $test_notice['type'] ) && 'success' === $test_notice['type'] ) ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
 				echo $this->render_view_to_string(
 					'admin-notice.php',
@@ -309,20 +297,20 @@ trait PWATG_Media_Trait {
 			}
 		}
 
-		if ( empty( $_GET['page'] ) || $this->get_bulk_page_slug() !== $_GET['page'] ) {
+		if ( empty( $_GET['page'] ) || PWATG::BULK_PAGE_SLUG !== $_GET['page'] ) {
 			return;
 		}
 
-		$notice = get_transient( Presswell_Alt_Text_Generator::NOTICE_KEY );
+		$notice = get_transient( PWATG::BULK_NOTICE_KEY );
 		if ( ! is_array( $notice ) ) {
 			return;
 		}
 
-		delete_transient( Presswell_Alt_Text_Generator::NOTICE_KEY );
+		delete_transient( PWATG::BULK_NOTICE_KEY );
 
 		$message = sprintf(
 			/* translators: 1: processed count, 2: updated count, 3: failed count */
-			esc_html__( 'Bulk generation complete. Processed: %1$d, Updated: %2$d, Failed: %3$d.', $text_domain ),
+			esc_html__( 'Bulk generation complete. Processed: %1$d, Updated: %2$d, Failed: %3$d.', PWATG::TEXT_DOMAIN ),
 			intval( $notice['processed'] ),
 			intval( $notice['updated'] ),
 			intval( $notice['failed'] )
