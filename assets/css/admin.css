@@ -1,20 +1,20 @@
 .pwatg-mt-12 {
-	margin-top: 12px;
+  margin-top: 12px;
 }
 
 .pwatg-api-key-wrap.is-hidden {
-	display: none;
+  display: none;
 }
 
 .pwatg-last-generated {
-	margin: 8px 0 0;
+  margin: 8px 0 0;
 }
 
 .pwatg-inline-action {
-	width: 65%;
-	clear: both;
-	float: right;
-	padding-top: 8px;
+  width: 65%;
+  clear: both;
+  float: right;
+  padding-top: 8px;
 }
 
 .wp_attachment_details .pwatg-inline-action {
@@ -23,9 +23,9 @@
 }
 
 .pwatg-inline-action-meta {
-	margin: 6px 0 0;
+  margin: 6px 0 0;
 }
 
 .wp_attachment_details #attachment_alt {
-	max-width: none;
+  max-width: none;
 }

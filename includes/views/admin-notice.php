@@ -1,8 +1,8 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+  exit;
 }
 ?>
 <div class="<?php echo esc_attr( $class ); ?>">
-	<p><?php echo esc_html( $text ); ?></p>
+  <p><?php echo esc_html( $text ); ?></p>
 </div>
