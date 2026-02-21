@@ -4,12 +4,17 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Settings registration, sanitization, and UI rendering helpers.
+ */
 trait PWATG_Settings_Trait {
+  /** Attach settings-related hooks. */
   protected function construct_settings_trait() {
     add_action( 'admin_init', [ $this, 'register_settings' ] );
     add_action( 'admin_post_' . PWATG::AJAX_TEST_PROVIDER, [ $this, 'handle_test_provider' ] );
   }
 
+  /** Register the plugin option, fields, and section definitions. */
   public function register_settings() {
     register_setting(
       'pwatg_settings_group',
@@ -69,6 +74,13 @@ trait PWATG_Settings_Trait {
     );
   }
 
+  /**
+   * Validate and clean the settings payload saved via the Settings API.
+   *
+   * @param array $input Raw option array.
+   *
+   * @return array
+   */
   public function sanitize_settings( $input ) {
     $defaults = $this->get_default_settings();
     $input    = is_array( $input ) ? $input : [];
@@ -117,6 +129,7 @@ trait PWATG_Settings_Trait {
     return $sanitized;
   }
 
+  /** Retrieve saved settings merged with defaults. */
   public function get_settings() {
     $defaults = $this->get_default_settings();
     $settings = wp_parse_args( get_option( PWATG::SETTINGS_KEY, [] ), $defaults );
@@ -138,6 +151,7 @@ trait PWATG_Settings_Trait {
     return $settings;
   }
 
+  /** Return the baseline defaults applied to new installs. */
   public function get_default_settings() {
     return [
       'service'       => 'openai',
@@ -152,6 +166,7 @@ trait PWATG_Settings_Trait {
     ];
   }
 
+  /** List human-friendly provider labels keyed by slug. */
   public function get_available_services() {
     $labels = [
       'openai'    => __( 'OpenAI', PWATG::TEXT_DOMAIN ),
@@ -169,6 +184,13 @@ trait PWATG_Settings_Trait {
     return apply_filters( 'pwatg_available_services', $services );
   }
 
+  /**
+   * Return the selectable models for a given provider.
+   *
+   * @param string $service Provider slug.
+   *
+   * @return array
+   */
   public function get_available_models( $service = 'openai' ) {
     $service = sanitize_key( $service );
     $all_models = [
@@ -202,6 +224,7 @@ trait PWATG_Settings_Trait {
     return apply_filters( 'pwatg_available_models', $models );
   }
 
+  /** Output the provider select control. */
   public function render_service_field() {
     $settings = $this->get_settings();
     $services = $this->get_available_services();
@@ -216,6 +239,7 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Render grouped API key inputs per provider. */
   public function render_api_key_field() {
     $settings = $this->get_settings();
     $services = $this->get_available_services();
@@ -250,6 +274,7 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Output the model select control tied to the chosen provider. */
   public function render_model_field() {
     $settings = $this->get_settings();
     $models   = $this->get_available_models( $settings['service'] );
@@ -265,6 +290,7 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Render textarea for the prompt seed configuration. */
   public function render_prompt_seed_field() {
     $settings = $this->get_settings();
     ?>
@@ -273,6 +299,7 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Output checkbox toggle for auto-generation setting. */
   public function render_auto_generate_field() {
     $settings = $this->get_settings();
     ?>
@@ -283,6 +310,7 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Display the plugin settings page markup. */
   public function render_settings_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
       return;
@@ -290,6 +318,7 @@ trait PWATG_Settings_Trait {
     $this->render_view( 'settings-page.php' );
   }
 
+  /** Process the "Test Connection" helper form. */
   public function handle_test_provider() {
     if ( ! current_user_can( 'manage_options' ) ) {
       wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );

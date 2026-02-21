@@ -5,7 +5,7 @@
  * Version: 0.1.0
  * Author: Ben Plum
  * License: GPLv2 or later
- * Text Domain: presswell-alt-text
+ * Text Domain: presswell-alt-text-generator
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -27,6 +27,11 @@ require_once __DIR__ . '/includes/services/class-provider-registry.php';
 require_once __DIR__ . '/includes/services/class-bulk-service.php';
 
 if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
+  /**
+   * Bootstrap container for all Presswell Alt Text Generator features.
+   *
+   * @since 0.1.0
+   */
   class Presswell_Alt_Text_Generator {
 	use PWATG_Assets_Trait;
     use PWATG_Bulk_Trait;
@@ -38,8 +43,16 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
     
     const PLUGIN_FILE = __FILE__;
 	
+    /**
+     * Cached singleton instance.
+     *
+     * @var Presswell_Alt_Text_Generator|null
+     */
     private static $instance = null;
 
+    /**
+     * Wire trait constructors and boot runtime hooks.
+     */
     protected function __construct() {
 	  $this->construct_assets_trait();
       $this->construct_bulk_trait();
@@ -48,9 +61,23 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
 	  $this->construct_settings_trait();
     }
 	
+    /**
+     * Prevent cloning the singleton.
+     */
 	private function __clone() {}
+
+    /**
+     * Prevent unserializing the singleton.
+     */
     private function __wakeup() {}
 
+    /**
+     * Return the shared plugin instance.
+     *
+     * @since 0.1.0
+     *
+     * @return Presswell_Alt_Text_Generator
+     */
     public static function instance() {
       if ( null === self::$instance ) {
         self::$instance = new self();
@@ -63,6 +90,13 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
 }
 
 if ( ! function_exists( 'presswell_alt_text_generator' ) ) {
+  /**
+   * Helper to access the singleton instance from procedural code.
+   *
+   * @since 0.1.0
+   *
+   * @return Presswell_Alt_Text_Generator
+   */
   function presswell_alt_text_generator() {
     return Presswell_Alt_Text_Generator::instance();
   }

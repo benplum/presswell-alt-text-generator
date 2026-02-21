@@ -4,11 +4,16 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Registers the plugin's admin menus/pages.
+ */
 trait PWATG_Pages_Trait {
+  /** Hook menu registration. */
   protected function construct_pages_trait() {
     add_action( 'admin_menu', [ $this, 'register_admin_pages' ] );
   }
 
+  /** Add the settings and bulk pages. */
   public function register_admin_pages() {
     add_options_page(
       __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),

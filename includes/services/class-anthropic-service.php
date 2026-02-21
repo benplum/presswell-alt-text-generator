@@ -5,7 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
+  /**
+   * Handles Anthropic message API interactions.
+   */
   class PWATG_Anthropic_Service {
+    /** Request alt text using Anthropic's multimodal endpoint. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -61,6 +65,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       return self::extract_text_block( $data, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text' ) );
     }
 
+    /** Request a quick text response to validate credentials/config. */
     public static function request_text( $api_key, $model, $prompt ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -102,6 +107,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       return self::extract_text_block( $data, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text' ) );
     }
 
+    /** Decode JSON body and convert non-2xx responses to WP_Error. */
     private static function decode_or_error( $response ) {
       $http_code = wp_remote_retrieve_response_code( $response );
       $data      = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -114,6 +120,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       return is_array( $data ) ? $data : [];
     }
 
+    /** Normalize Anthropic HTTP errors for upstream handling. */
     private static function build_api_error( $http_code, $error_message, $response ) {
       $code = 'pwatg_api_error';
       if ( 429 === $http_code ) {
@@ -135,6 +142,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       return new WP_Error( $code, $error_message, $data );
     }
 
+    /** Pull the Retry-After seconds header if present. */
     private static function parse_retry_after_header( $response ) {
       $retry_after = wp_remote_retrieve_header( $response, 'retry-after' );
       if ( is_array( $retry_after ) ) {
@@ -150,6 +158,11 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       return ctype_digit( $retry_after ) ? (int) $retry_after : 0;
     }
 
+    /**
+     * Traverse the response blocks to find the textual output.
+     *
+     * @return string|WP_Error
+     */
     private static function extract_text_block( array $data, $error_code, $error_message ) {
       if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
         foreach ( $data['content'] as $block ) {

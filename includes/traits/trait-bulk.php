@@ -4,16 +4,30 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Provides bulk generation routes and orchestration helpers.
+ */
 trait PWATG_Bulk_Trait {
   
+  /**
+   * Lazily-instantiated worker that performs the heavy lifting.
+   *
+   * @var PWATG_Bulk_Service|null
+   */
   protected $bulk_service;
 
+  /** Register WP hooks for bulk workflows. */
   protected function construct_bulk_trait() {
     add_action( 'admin_post_' . PWATG::AJAX_GENERATE_BULK, [ $this, 'handle_bulk_generation' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_INIT_BULK, [ $this, 'handle_bulk_init_ajax' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_BULK, [ $this, 'handle_bulk_generate_ajax' ] );
   }
   
+  /**
+   * Get (and create if needed) the reusable bulk service instance.
+   *
+   * @return PWATG_Bulk_Service
+   */
   protected function get_bulk_service() {
     if ( null === $this->bulk_service ) {
       $this->bulk_service = new PWATG_Bulk_Service( $this );
@@ -22,6 +36,7 @@ trait PWATG_Bulk_Trait {
     return $this->bulk_service;
   }
 
+  /** AJAX: build the attachment list for a bulk run. */
   public function handle_bulk_init_ajax() {
     if ( ! current_user_can( 'manage_options' ) ) {
       wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
@@ -51,6 +66,7 @@ trait PWATG_Bulk_Trait {
     );
   }
 
+  /** AJAX: process a queued batch of attachment IDs. */
   public function handle_bulk_generate_ajax() {
     if ( ! current_user_can( 'manage_options' ) ) {
       wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
@@ -88,6 +104,7 @@ trait PWATG_Bulk_Trait {
     );
   }
 
+  /** Render the Media → Alt Text Generator admin page. */
   public function render_bulk_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
       return;
@@ -100,6 +117,7 @@ trait PWATG_Bulk_Trait {
     );
   }
 
+  /** Handle the non-AJAX bulk form submission fallback. */
   public function handle_bulk_generation() {
     if ( ! current_user_can( 'manage_options' ) ) {
       wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );

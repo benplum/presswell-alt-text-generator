@@ -4,6 +4,9 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Central location for plugin-wide slugs, option keys, and identifiers.
+ */
 class PWATG {
 
   const KEY = 'pwatg';

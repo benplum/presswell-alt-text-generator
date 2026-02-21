@@ -5,7 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
+  /**
+   * Thin wrapper around OpenAI's chat completions API.
+   */
   class PWATG_OpenAI_Service {
+    /** Request alt text describing the supplied image. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -65,6 +69,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
       return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text' ) );
     }
 
+    /** Request a short text-only completion (used for testing credentials). */
     public static function request_text( $api_key, $model, $prompt ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -109,6 +114,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
       return new WP_Error( 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text' ) );
     }
 
+    /** Parse the JSON body and convert non-200 responses into WP_Error. */
     private static function decode_or_error( $response ) {
       $http_code = wp_remote_retrieve_response_code( $response );
       $data      = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -121,6 +127,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
       return is_array( $data ) ? $data : [];
     }
 
+    /** Normalize provider HTTP errors into consistent WP_Error payloads. */
     private static function build_api_error( $http_code, $error_message, $response ) {
       $code = 'pwatg_api_error';
       if ( 429 === $http_code ) {
@@ -142,6 +149,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
       return new WP_Error( $code, $error_message, $data );
     }
 
+    /** Extract Retry-After value (seconds) if included in the response headers. */
     private static function parse_retry_after_header( $response ) {
       $retry_after = wp_remote_retrieve_header( $response, 'retry-after' );
       if ( is_array( $retry_after ) ) {

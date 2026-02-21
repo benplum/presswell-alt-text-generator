@@ -4,7 +4,11 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Media-library specific integration points for single-image workflows.
+ */
 trait PWATG_Media_Trait {
+  /** Wire up WordPress filters/actions for media interactions. */
   protected function construct_media_trait() {
     add_filter( 'wp_generate_attachment_metadata', [ $this, 'maybe_generate_on_upload_from_metadata' ], 20, 2 );
     add_action( 'admin_post_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation' ] );
@@ -14,6 +18,14 @@ trait PWATG_Media_Trait {
     add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
   }
 
+  /**
+   * Inject a row action on the media list table for eligible images.
+   *
+   * @param array   $actions Existing row actions.
+   * @param WP_Post $post    Attachment being rendered.
+   *
+   * @return array
+   */
   public function add_media_row_action( $actions, $post ) {
     if ( ! wp_attachment_is_image( $post->ID ) ) {
       return $actions;
@@ -38,6 +50,14 @@ trait PWATG_Media_Trait {
     return $actions;
   }
 
+  /**
+   * Add a custom field inside the attachment modal sidebar.
+   *
+   * @param array   $form_fields Existing fields array.
+   * @param WP_Post $post        Attachment.
+   *
+   * @return array
+   */
   public function add_media_modal_action_field( $form_fields, $post ) {
     if ( ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $post->ID ) ) {
       return $form_fields;
@@ -89,16 +109,30 @@ trait PWATG_Media_Trait {
     return $form_fields;
   }
 
+  /** Placeholder for optional DOM adjustments kept for parity. */
   protected function render_alt_field_proximity_script() {
     return;
   }
 
+  /**
+   * Run generation when uploads finish and metadata is saved.
+   *
+   * @param array $metadata      Attachment metadata.
+   * @param int   $attachment_id Attachment ID.
+   *
+   * @return array
+   */
   public function maybe_generate_on_upload_from_metadata( $metadata, $attachment_id ) {
     $this->maybe_generate_on_upload( $attachment_id );
 
     return $metadata;
   }
 
+  /**
+   * Conditionally generate alt text if an upload lacks it.
+   *
+   * @param int $attachment_id Attachment ID.
+   */
   protected function maybe_generate_on_upload( $attachment_id ) {
     $settings = $this->get_settings();
     if ( empty( $settings['auto_generate'] ) ) {
@@ -117,6 +151,7 @@ trait PWATG_Media_Trait {
     $this->generate_alt_text_for_attachment( $attachment_id, false );
   }
 
+  /** Handle non-AJAX requests for single-image generation. */
   public function handle_single_generation() {
     $attachment_id = isset( $_REQUEST['attachment_id'] ) ? absint( $_REQUEST['attachment_id'] ) : 0;
 
@@ -154,6 +189,7 @@ trait PWATG_Media_Trait {
     exit;
   }
 
+  /** AJAX endpoint for inline single-image generation. */
   public function handle_single_generation_ajax() {
     $attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
 
@@ -208,6 +244,13 @@ trait PWATG_Media_Trait {
     );
   }
 
+  /**
+   * Build a nonce-protected URL for the admin-post handler.
+   *
+   * @param int $attachment_id Attachment ID.
+   *
+   * @return string
+   */
   protected function get_single_action_url( $attachment_id ) {
     $attachment_id = absint( $attachment_id );
 
@@ -217,6 +260,13 @@ trait PWATG_Media_Trait {
     );
   }
 
+  /**
+   * Human-friendly label describing when the attachment was last updated.
+   *
+   * @param int $attachment_id Attachment ID.
+   *
+   * @return string
+   */
   protected function get_last_generated_label( $attachment_id ) {
     $raw = (string) get_post_meta( $attachment_id, PWATG::META_KEY_LAST_GENERATED, true );
 
@@ -252,6 +302,7 @@ trait PWATG_Media_Trait {
     );
   }
 
+  /** Output various contextual admin notices relevant to the plugin. */
   public function render_admin_notices() {
     if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
       if ( ! current_user_can( 'upload_files' ) ) {

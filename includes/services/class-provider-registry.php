@@ -5,7 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
+  /**
+   * Resolves provider slugs to service classes and proxies shared calls.
+   */
   class PWATG_Provider_Registry {
+    /** Proxy a provider-specific alt-text request. */
     public static function request_alt_text( $service, $api_key, $model, $prompt, $mime_type, $image_binary ) {
       $provider = self::resolve( $service );
       if ( ! is_callable( [ $provider, 'request_alt_text' ] ) ) {
@@ -15,6 +19,7 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
       return call_user_func( [ $provider, 'request_alt_text' ], $api_key, $model, $prompt, $mime_type, $image_binary );
     }
 
+    /** Proxy a provider-specific text request. */
     public static function request_text( $service, $api_key, $model, $prompt ) {
       $provider = self::resolve( $service );
       if ( ! is_callable( [ $provider, 'request_text' ] ) ) {
@@ -24,6 +29,13 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
       return call_user_func( [ $provider, 'request_text' ], $api_key, $model, $prompt );
     }
 
+    /**
+     * Resolve provider slug to a class name, honoring filters and fallbacks.
+     *
+     * @param string $service Provider slug.
+     *
+     * @return string
+     */
     private static function resolve( $service ) {
       $service = sanitize_key( (string) $service );
       $map     = PWATG::PROVIDER_MAP;

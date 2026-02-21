@@ -2,6 +2,15 @@
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
+
+/**
+ * Inline action link shown within the Media Library list table.
+ *
+ * @var string $url
+ * @var int    $attachment_id
+ * @var bool   $has_alt
+ * @var string $button_label
+ */
 ?>
 <span class="pwatg-row-action">
   <a href="<?php echo esc_url( $url ); ?>"

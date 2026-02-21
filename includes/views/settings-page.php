@@ -2,6 +2,10 @@
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
+
+/**
+ * Admin Settings → Alt Text Generator markup.
+ */
 ?>
 <div class="wrap">
   <h1><?php echo esc_html__( 'Alt Text Generator', PWATG::TEXT_DOMAIN ); ?></h1>

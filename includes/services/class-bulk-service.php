@@ -5,13 +5,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
+  /** Handles batch querying and processing for bulk runs. */
   class PWATG_Bulk_Service {
+    /** @var Presswell_Alt_Text_Generator */
     protected $plugin;
 
+    /**
+     * @param Presswell_Alt_Text_Generator $plugin Main plugin instance.
+     */
     public function __construct( $plugin ) {
       $this->plugin = $plugin;
     }
 
+    /**
+     * Fetch attachment IDs filtered by whether they already contain alt text.
+     *
+     * @param bool $regenerate_existing Include attachments that already have alt text.
+     *
+     * @return int[]
+     */
     public function get_attachment_ids( $regenerate_existing ) {
       $args = [
         'post_type'      => 'attachment',
@@ -41,6 +53,16 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       return array_map( 'absint', get_posts( $args ) );
     }
 
+    /**
+     * Process a slice of attachment IDs and return structured progress data.
+     *
+     * @param array $ids                  Full ID list for the run.
+     * @param int   $offset               Current offset pointer.
+     * @param int   $batch_size           Number of items to process.
+     * @param bool  $regenerate_existing  Whether to overwrite existing alt text.
+     *
+     * @return array
+     */
     public function process_batch( $ids, $offset, $batch_size, $regenerate_existing ) {
       $ids        = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
       $offset     = absint( $offset );
@@ -125,6 +147,13 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       return $response;
     }
 
+    /**
+     * Sequential fallback handler when the bulk UI submits traditionally.
+     *
+     * @param bool $regenerate_existing Whether to overwrite existing alt text.
+     *
+     * @return array
+     */
     public function run_bulk_generation( $regenerate_existing ) {
       $attachment_ids = $this->get_attachment_ids( $regenerate_existing );
 
@@ -154,6 +183,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       ];
     }
 
+    /** Return a thumbnail URL (or fallback to the attachment URL). */
     protected function get_attachment_thumb_url( $attachment_id ) {
       $thumb = wp_get_attachment_image_url( $attachment_id, 'thumbnail' );
       if ( ! $thumb ) {
@@ -163,6 +193,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       return $thumb ? esc_url_raw( $thumb ) : '';
     }
 
+    /** Inspect WP_Error data for retry metadata used by the bulk UI. */
     protected function extract_retry_after_from_error( $error ) {
       if ( ! ( $error instanceof WP_Error ) ) {
         return 0;
@@ -182,6 +213,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       return 0;
     }
 
+    /** Determine whether a WP_Error signals rate-limit or quota issues. */
     protected function is_rate_limit_wp_error( $error ) {
       if ( ! ( $error instanceof WP_Error ) ) {
         return false;

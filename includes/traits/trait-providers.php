@@ -4,11 +4,28 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Provider-facing helpers including rate limit tracking and adapters.
+ */
 trait PWATG_Providers_Trait {
+  /**
+   * Issue a lightweight text request to confirm credentials are valid.
+   *
+   * @param string $service Provider slug.
+   * @param string $api_key Secret token.
+   * @param string $model   Model identifier.
+   *
+   * @return string|WP_Error
+   */
   public function test_provider_connection( $service, $api_key, $model ) {
     return PWATG_Provider_Registry::request_text( $service, $api_key, $model, 'Reply with: OK' );
   }
 
+  /**
+   * Return the active rate-limit lock payload if enforced.
+   *
+   * @return array|null
+   */
   protected function get_rate_limit_lock_state() {
     $lock = $this->get_raw_rate_limit_lock();
     if ( ! $lock ) {
@@ -30,6 +47,14 @@ trait PWATG_Providers_Trait {
     ];
   }
 
+  /**
+   * Build a localized admin-friendly rate limit notice.
+   *
+   * @param array $lock      Stored lock payload.
+   * @param int   $remaining Seconds remaining.
+   *
+   * @return string
+   */
   protected function format_rate_limit_lock_message( array $lock, $remaining ) {
     $base_message = isset( $lock['message'] ) && '' !== trim( (string) $lock['message'] )
       ? trim( (string) $lock['message'] )
@@ -49,6 +74,11 @@ trait PWATG_Providers_Trait {
     );
   }
 
+  /**
+   * Convert lock state to a WP_Error for upstream checks.
+   *
+   * @return WP_Error|null
+   */
   protected function get_rate_limit_block_error() {
     $lock = $this->get_rate_limit_lock_state();
     if ( ! $lock ) {
@@ -65,6 +95,7 @@ trait PWATG_Providers_Trait {
     );
   }
 
+  /** Potentially persist a new lock duration if providers respond with rate limits. */
   protected function maybe_start_rate_limit_lock( WP_Error $error ) {
     if ( ! $this->is_rate_limit_error( $error ) ) {
       return;
@@ -91,6 +122,7 @@ trait PWATG_Providers_Trait {
     set_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration );
   }
 
+  /** Determine how long a lock should last given the error payload. */
   protected function determine_rate_limit_duration( WP_Error $error ) {
     if ( 'pwatg_quota_exceeded' === $error->get_error_code() ) {
       return PWATG::QUOTA_LOCK_SECONDS;
@@ -107,6 +139,14 @@ trait PWATG_Providers_Trait {
     return max( PWATG::RATE_LIMIT_MIN_SECONDS, min( $duration, PWATG::RATE_LIMIT_MAX_SECONDS ) );
   }
 
+  /**
+   * Build the base error sentence combining provider label and message.
+   *
+   * @param WP_Error $error          Provider error.
+   * @param string   $provider_slug  Provider slug.
+   *
+   * @return string
+   */
   protected function build_rate_limit_base_message( WP_Error $error, $provider_slug ) {
     $label   = $this->get_provider_label_for_slug( $provider_slug );
     $message = trim( (string) $error->get_error_message() );
@@ -124,6 +164,7 @@ trait PWATG_Providers_Trait {
     return $message;
   }
 
+  /** Convert a provider slug into a human-friendly label. */
   protected function get_provider_label_for_slug( $slug ) {
     $slug = sanitize_key( (string) $slug );
     if ( '' === $slug ) {
@@ -140,6 +181,7 @@ trait PWATG_Providers_Trait {
     return ucwords( str_replace( '-', ' ', $slug ) );
   }
 
+  /** Inspect error data to find which provider triggered it. */
   protected function extract_provider_slug_from_error( WP_Error $error ) {
     $data = $error->get_error_data();
     if ( is_array( $data ) && isset( $data['provider'] ) ) {
@@ -149,6 +191,7 @@ trait PWATG_Providers_Trait {
     return '';
   }
 
+  /** Check whether an error code maps to rate-limiting behavior. */
   protected function is_rate_limit_error( $error ) {
     if ( ! ( $error instanceof WP_Error ) ) {
       return false;
@@ -159,6 +202,7 @@ trait PWATG_Providers_Trait {
     return in_array( $code, [ 'pwatg_rate_limited', 'pwatg_quota_exceeded' ], true );
   }
 
+  /** Fetch the raw transient payload storing rate-limit metadata. */
   protected function get_raw_rate_limit_lock() {
     $lock = get_transient( PWATG::RATE_LIMIT_TRANSIENT );
     if ( ! is_array( $lock ) ) {
@@ -177,12 +221,21 @@ trait PWATG_Providers_Trait {
     return $lock;
   }
 
+  /** Convenience wrapper returning the formatted notice text. */
   protected function get_rate_limit_notice_text() {
     $lock = $this->get_rate_limit_lock_state();
 
     return $lock ? $lock['message'] : '';
   }
 
+  /**
+   * Core helper that loads attachment data and asks providers for new alt text.
+   *
+   * @param int  $attachment_id    Attachment ID to process.
+   * @param bool $force_regenerate Whether to overwrite existing text.
+   *
+   * @return bool|WP_Error False when skipped, true when updated, or error.
+   */
   public function generate_alt_text_for_attachment( $attachment_id, $force_regenerate = false ) {
     $attachment_id = absint( $attachment_id );
     if ( ! $attachment_id || ! wp_attachment_is_image( $attachment_id ) ) {

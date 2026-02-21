@@ -2,6 +2,12 @@
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
+
+/**
+ * Admin Media → Alt Text Bulk Generator markup.
+ *
+ * @var string $rate_limit_message Optional warning string.
+ */
 ?>
 <div class="wrap">
   <?php wp_nonce_field( PWATG::NONCE_GENERATE_BULK, 'pwatg_bulk_nonce', false ); ?>

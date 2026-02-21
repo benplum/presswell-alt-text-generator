@@ -2,6 +2,16 @@
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
+
+/**
+ * Button section rendered inside the attachment modal sidebar.
+ *
+ * @var string $url
+ * @var int    $attachment_id
+ * @var bool   $has_alt
+ * @var string $button_label
+ * @var string $last_generated
+ */
 ?>
 <a href="<?php echo esc_url( $url ); ?>"
   class="button pwatg-generate-alt-action" 

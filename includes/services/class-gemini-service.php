@@ -5,7 +5,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
+  /** Interface to Google's Gemini generative language endpoint. */
   class PWATG_Gemini_Service {
+    /** Request alt text for a specific image. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -41,6 +43,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return self::extract_text_parts( $response, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text' ) );
     }
 
+    /** Request text-only completions for diagnostics. */
     public static function request_text( $api_key, $model, $prompt ) {
       if ( '' === trim( (string) $api_key ) ) {
         return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
@@ -70,10 +73,12 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return self::extract_text_parts( $response, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text' ) );
     }
 
+    /** Compose the REST endpoint for the selected model/key. */
     private static function build_url( $model, $api_key ) {
       return 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $api_key );
     }
 
+    /** Fire a POST request and convert failures to WP_Error. */
     private static function request( $url, array $body, $timeout ) {
       $response = wp_remote_post(
         $url,
@@ -101,6 +106,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return is_array( $data ) ? $data : [];
     }
 
+    /** Extract the concatenated text parts from a successful response. */
     private static function extract_text_parts( array $data, $error_code, $error_message ) {
       if ( isset( $data['candidates'][0]['content']['parts'] ) && is_array( $data['candidates'][0]['content']['parts'] ) ) {
         $parts = $data['candidates'][0]['content']['parts'];
@@ -119,6 +125,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return new WP_Error( $error_code, $error_message );
     }
 
+    /** Normalize provider errors and capture retry metadata. */
     private static function build_api_error( $http_code, $error_message, $response ) {
       $code = 'pwatg_api_error';
       if ( 429 === $http_code ) {
@@ -140,6 +147,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return new WP_Error( $code, $error_message, $data );
     }
 
+    /** Retrieve Retry-After header seconds if available. */
     private static function parse_retry_after_header( $response ) {
       $retry_after = wp_remote_retrieve_header( $response, 'retry-after' );
       if ( is_array( $retry_after ) ) {

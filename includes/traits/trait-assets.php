@@ -4,11 +4,20 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit;
 }
 
+/**
+ * Handles registering and localizing all admin-side assets.
+ */
 trait PWATG_Assets_Trait {
+  /** Hook asset loaders into WordPress. */
   protected function construct_assets_trait() {
     add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
   }
 
+  /**
+   * Load CSS/JS needed across the plugin admin experiences.
+   *
+   * @param string $hook_suffix Current admin page identifier.
+   */
   public function enqueue_admin_assets( $hook_suffix ) {
     if ( ! is_admin() ) {
       return;
@@ -139,12 +148,26 @@ trait PWATG_Assets_Trait {
     }
   }
 
+  /**
+   * Determine whether the current hook/page is the settings screen.
+   *
+   * @param string $hook_suffix Admin hook.
+   *
+   * @return bool
+   */
   private function is_settings_page( $hook_suffix ) {
     $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
     return PWATG::SETTINGS_PAGE_SCREEN_ID === $hook_suffix && PWATG::SETTINGS_PAGE_SLUG === $page;
   }
 
+  /**
+   * Determine whether the current hook/page is the bulk processing screen.
+   *
+   * @param string $hook_suffix Admin hook.
+   *
+   * @return bool
+   */
   private function is_bulk_page( $hook_suffix ) {
     $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
