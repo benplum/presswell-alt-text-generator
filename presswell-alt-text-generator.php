@@ -33,11 +33,11 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
    * @since 0.1.0
    */
   class Presswell_Alt_Text_Generator {
-	use PWATG_Assets_Trait;
+	  use PWATG_Assets_Trait;
     use PWATG_Bulk_Trait;
-	use PWATG_Helpers_Trait;
+	  use PWATG_Helpers_Trait;
     use PWATG_Media_Trait;
-	use PWATG_Pages_Trait;
+	  use PWATG_Pages_Trait;
     use PWATG_Providers_Trait;
     use PWATG_Settings_Trait;
     
@@ -54,22 +54,22 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
      * Wire trait constructors and boot runtime hooks.
      */
     protected function __construct() {
-	  $this->construct_assets_trait();
+	    $this->construct_assets_trait();
       $this->construct_bulk_trait();
       $this->construct_media_trait();
-	  $this->construct_pages_trait();
-	  $this->construct_settings_trait();
+	    $this->construct_pages_trait();
+	    $this->construct_settings_trait();
     }
 	
     /**
      * Prevent cloning the singleton.
      */
-	private function __clone() {}
+	  public function __clone() {}
 
     /**
      * Prevent unserializing the singleton.
      */
-    private function __wakeup() {}
+    public function __wakeup() {}
 
     /**
      * Return the shared plugin instance.
