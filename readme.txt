@@ -7,7 +7,7 @@ Stable tag: trunk
 License: GNU General Public License v2.0 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Generate AI-powered alt text for WordPress media uploads and bulk runs.
+Generate AI-powered alt text for WordPress media.
 
 == Description ==
 

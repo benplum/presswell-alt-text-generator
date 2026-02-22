@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Presswell Alt Text Generator
- * Description: Generates AI-powered alt text for WordPress media uploads and in bulk.
+ * Description: Generate AI-powered alt text for WordPress media.
  * Version: 0.1.0
  * Author: Ben Plum
  * License: GPLv2 or later
