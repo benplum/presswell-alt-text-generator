@@ -362,7 +362,7 @@ trait PWATG_Settings_Trait {
     } else {
       $response_text = sanitize_text_field( (string) $result );
       if ( '' !== $response_text && mb_strlen( $response_text ) > 120 ) {
-        $response_text = mb_substr( $response_text, 0, 120 ) . '…';
+        $response_text = mb_substr( $response_text, 0, 120 ) . '...';
       }
 
       $message = __( 'Connection successful.', PWATG::TEXT_DOMAIN );

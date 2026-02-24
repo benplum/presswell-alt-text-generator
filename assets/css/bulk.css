@@ -92,3 +92,28 @@
   font-weight: 600;
   color: #5c1a1d;
 }
+
+.pwatg-count {
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+.pwatg-count-title {
+  margin: 0 0 .3em;
+}
+
+.pwatg-count-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.pwatg-count-actions .button-link {
+  padding-left: 0;
+  font-weight: 600;
+}
+
+.pwatg-inline-status {
+  font-weight: 600;
+}

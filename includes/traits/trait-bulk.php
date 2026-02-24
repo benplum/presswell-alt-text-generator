@@ -15,12 +15,15 @@ trait PWATG_Bulk_Trait {
    * @var PWATG_Bulk_Service|null
    */
   protected $bulk_service;
+  /** Cached missing alt count used across the page load. */
+  protected $missing_alt_count_cache;
 
   /** Register WP hooks for bulk workflows. */
   protected function construct_bulk_trait() {
     add_action( 'admin_post_' . PWATG::AJAX_GENERATE_BULK, [ $this, 'handle_bulk_generation' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_INIT_BULK, [ $this, 'handle_bulk_init_ajax' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_BULK, [ $this, 'handle_bulk_generate_ajax' ] );
+    add_action( 'wp_ajax_' . PWATG::AJAX_SCAN_MISSING, [ $this, 'handle_bulk_scan_missing_ajax' ] );
   }
   
   /**
@@ -91,6 +94,7 @@ trait PWATG_Bulk_Trait {
     $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
 
     $results = $this->get_bulk_service()->process_batch( $raw_ids, $offset, $batch_size, $regenerate_existing );
+    $this->missing_alt_count_cache = $results['missing'];
 
     wp_send_json_success(
       [
@@ -100,6 +104,24 @@ trait PWATG_Bulk_Trait {
         'items'       => $results['items'],
         'next_offset' => $results['next_offset'],
         'done'        => $results['done'],
+        'missing'     => $results['missing'],
+      ]
+    );
+  }
+
+  /** AJAX: scan for attachments that are missing alt text. */
+  public function handle_bulk_scan_missing_ajax() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
+    }
+
+    check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
+
+    $count = $this->get_missing_alt_count( true );
+
+    wp_send_json_success(
+      [
+        'count' => $count,
       ]
     );
   }
@@ -113,6 +135,7 @@ trait PWATG_Bulk_Trait {
       'bulk-page.php',
       [
         'rate_limit_message' => $this->get_rate_limit_notice_text(),
+        'missing_alt_count'  => $this->get_missing_alt_count(),
       ]
     );
   }
@@ -145,5 +168,14 @@ trait PWATG_Bulk_Trait {
 
     wp_safe_redirect( PWATG::BULK_PAGE_URL );
     exit;
+  }
+
+  /** Retrieve (and optionally refresh) the missing alt count cache. */
+  protected function get_missing_alt_count( $force_refresh = false ) {
+    if ( $force_refresh || null === $this->missing_alt_count_cache ) {
+      $this->missing_alt_count_cache = $this->get_bulk_service()->count_missing_alt_attachments();
+    }
+
+    return max( 0, (int) $this->missing_alt_count_cache );
   }
 }

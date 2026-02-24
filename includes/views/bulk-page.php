@@ -25,6 +25,25 @@ if ( ! defined( 'ABSPATH' ) ) {
   <p>
     <?php echo esc_html__( 'Generate alt text for existing images. By default only images with missing alt text are processed.', PWATG::TEXT_DOMAIN ); ?>
   </p>
+  
+  <?php
+    $missing_alt_count = isset( $missing_alt_count ) ? absint( $missing_alt_count ) : 0;
+  ?>
+  <div class="pwatg-count">
+    <h2 class="pwatg-count-title">
+      Images missing alt text: 
+      <span id="pwatg_missing_count" data-initial="<?php echo esc_attr( $missing_alt_count ); ?>">
+        <?php echo esc_html( number_format_i18n( $missing_alt_count ) ); ?>
+      </span>
+    </h2>
+    <p class="pwatg-count-actions">
+      <a href="#" id="pwatg_refresh_missing" class="button-link">
+        <?php echo esc_html__( 'Check again', PWATG::TEXT_DOMAIN ); ?>
+      </a>
+      <span id="pwatg_refresh_status" class="pwatg-inline-status" aria-live="polite"></span>
+    </p>
+  </div>
+  
   <p>
     <label>
       <input type="checkbox" id="pwatg_regenerate_existing" value="1" />

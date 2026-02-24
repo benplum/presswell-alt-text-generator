@@ -3,6 +3,7 @@ jQuery(function($) {
   const nonceField = document.getElementById('pwatg_bulk_nonce');
   const ajaxAction = data.ajaxAction || 'pwatg_generate_bulk';
   const ajaxInitAction = data.ajaxInitAction || 'pwatg_bulk_init';
+  const ajaxScanAction = data.ajaxScanAction || 'pwatg_scan_missing_alt';
   const i18n = data.i18n || {};
   const startButton = $('#pwatg_start_bulk');
   const progressWrap = $('#pwatg_progress_wrap');
@@ -11,6 +12,10 @@ jQuery(function($) {
   const regenerateInput = $('#pwatg_regenerate_existing');
   const resultsTable = $('#pwatg_results_table');
   const resultsBody = $('#pwatg_results_body');
+  const missingCount = $('#pwatg_missing_count');
+  const refreshLink = $('#pwatg_refresh_missing');
+  const refreshStatus = $('#pwatg_refresh_status');
+  const refreshDefaultText = refreshLink.length ? refreshLink.text().trim() : '';
 
   let ids = [];
   let offset = 0;
@@ -18,7 +23,8 @@ jQuery(function($) {
   let processed = 0;
   let updated = 0;
   let failed = 0;
-  const batchSize = 5;
+  let batchSize = 5;
+  let missing = 0;
 
   function t(key, fallback) {
     return Object.prototype.hasOwnProperty.call(i18n, key) ? i18n[key] : fallback;
@@ -44,6 +50,48 @@ jQuery(function($) {
 
     return data.nonce || '';
   }
+
+  function formatNumber(value) {
+    const intVal = parseInt(value, 10) || 0;
+    if (window.Intl && typeof Intl.NumberFormat === 'function') {
+      return new Intl.NumberFormat().format(intVal);
+    }
+    return String(intVal);
+  }
+
+  function setMissingCount(value) {
+    missing = Math.max(0, parseInt(value, 10) || 0);
+    if (missingCount.length) {
+      missingCount.text(formatNumber(missing));
+    }
+  }
+
+  function updateMissingCountFromResponse(response, fallbackDecrease) {
+    if (response && typeof response.data !== 'undefined' && typeof response.data.missing !== 'undefined') {
+      setMissingCount(response.data.missing);
+      return;
+    }
+
+    if (fallbackDecrease > 0) {
+      setMissingCount(Math.max(0, missing - fallbackDecrease));
+    }
+  }
+
+  (function initMissingCount() {
+    if (!missingCount.length) {
+      return;
+    }
+
+    const initial = parseInt(missingCount.data('initial'), 10);
+    if (!isNaN(initial)) {
+      setMissingCount(initial);
+      return;
+    }
+
+    if (typeof data.missing !== 'undefined') {
+      setMissingCount(data.missing);
+    }
+  })();
 
   function updateProgress() {
     const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
@@ -125,6 +173,7 @@ jQuery(function($) {
       failed += response.data.failed;
       appendRows(response.data.items || []);
       updateProgress();
+      updateMissingCountFromResponse(response, response.data.updated);
 
       if (response.data.halted) {
         const haltCode = response.data.halt_code ? String(response.data.halt_code) : '';
@@ -159,10 +208,10 @@ jQuery(function($) {
   }
 
   startButton.on('click', function() {
-    startButton.prop('disabled', true).text(t('preparing', 'Preparing…'));
+    startButton.prop('disabled', true).text(t('preparing', 'Preparing...'));
     progressWrap.show();
     progressBar.css('width', '0%');
-    progressText.text(t('preparingList', 'Preparing image list…'));
+    progressText.text(t('preparingList', 'Preparing image list...'));
     resultsBody.empty();
     resultsTable.hide();
 
@@ -190,11 +239,44 @@ jQuery(function($) {
         return;
       }
 
-      startButton.text(t('running', 'Running…'));
+      startButton.text(t('running', 'Running...'));
       runBatch();
     }).fail(function(jqXHR) {
       const message = getAjaxErrorMessage(jqXHR, t('initFailed', 'Could not initialize bulk generation.'));
       finish(message);
+    });
+  });
+
+  refreshLink.on('click', function(event) {
+    event.preventDefault();
+
+    if (!refreshLink.length || refreshLink.attr('aria-disabled') === 'true') {
+      return;
+    }
+
+    refreshLink.attr('aria-disabled', 'true').text(t('checking', 'Checking...'));
+    refreshStatus.text('');
+
+    $.post(ajaxurl, {
+      action: ajaxScanAction,
+      nonce: getNonce(),
+    }).done(function(response) {
+      if (!response || !response.success) {
+        const message = response && response.data && response.data.message ? response.data.message : t('checkFailed', 'Could not refresh the count.');
+        refreshStatus.text(message);
+        return;
+      }
+
+      const newCount = typeof response.data.count !== 'undefined' ? response.data.count : 0;
+      setMissingCount(newCount);
+      const statusText = newCount ? t('countUpdated', 'Count updated.') : t('countZero', 'No images without alt text were found.');
+      refreshStatus.text(statusText);
+    }).fail(function(jqXHR) {
+      const message = getAjaxErrorMessage(jqXHR, t('checkFailed', 'Could not refresh the count.'));
+      refreshStatus.text(message);
+    }).always(function() {
+      const resetText = refreshDefaultText || t('checkAgain', 'Check again');
+      refreshLink.attr('aria-disabled', 'false').text(resetText);
     });
   });
 });

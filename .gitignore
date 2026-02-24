@@ -1,6 +1,9 @@
 node_modules/
+vendor/
 git
 svn
+
+.phpunit*
 
 *.DS_Store
 .AppleDouble

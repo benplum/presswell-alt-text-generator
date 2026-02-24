@@ -61,6 +61,7 @@ trait PWATG_Assets_Trait {
     }
 
     if ( $this->is_bulk_page( $hook_suffix ) ) {
+      $missing_count = $this->get_missing_alt_count();
       wp_enqueue_style(
         'pwatg-css-bulk',
         $this->get_asset_url( 'css/bulk.css' ),
@@ -83,20 +84,27 @@ trait PWATG_Assets_Trait {
           'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
           'ajaxAction' => PWATG::AJAX_GENERATE_BULK,
           'ajaxInitAction' => PWATG::AJAX_INIT_BULK,
+          'ajaxScanAction' => PWATG::AJAX_SCAN_MISSING,
+          'missingCount' => $missing_count,
           'i18n'  => [
             'runBulk'      => __( 'Run Bulk Generation', PWATG::TEXT_DOMAIN ),
             'bulkComplete' => __( 'Bulk generation complete.', PWATG::TEXT_DOMAIN ),
             'batchFailed'  => __( 'Batch request failed.', PWATG::TEXT_DOMAIN ),
             'bulkFailed'   => __( 'Could not complete bulk generation.', PWATG::TEXT_DOMAIN ),
-            'preparing'    => __( 'Preparing…', PWATG::TEXT_DOMAIN ),
-            'preparingList'=> __( 'Preparing image list…', PWATG::TEXT_DOMAIN ),
+            'preparing'    => __( 'Preparing...', PWATG::TEXT_DOMAIN ),
+            'preparingList'=> __( 'Preparing image list...', PWATG::TEXT_DOMAIN ),
             'initFailed'   => __( 'Could not initialize bulk generation.', PWATG::TEXT_DOMAIN ),
             'noImages'     => __( 'No matching images found for this run.', PWATG::TEXT_DOMAIN ),
-            'running'      => __( 'Running…', PWATG::TEXT_DOMAIN ),
+            'running'      => __( 'Running...', PWATG::TEXT_DOMAIN ),
             'failedAlt'    => __( '[Failed to generate]', PWATG::TEXT_DOMAIN ),
             'rateLimited'  => __( 'Bulk paused due to provider limits. Try again shortly.', PWATG::TEXT_DOMAIN ),
             'quotaExceeded'=> __( 'Bulk paused because the provider quota was exceeded.', PWATG::TEXT_DOMAIN ),
             'seeDetails'   => __( 'See failed rows for details.', PWATG::TEXT_DOMAIN ),
+            'checkAgain'   => __( 'Check again', PWATG::TEXT_DOMAIN ),
+            'checking'     => __( 'Checking...', PWATG::TEXT_DOMAIN ),
+            'checkFailed'  => __( 'Could not refresh the count.', PWATG::TEXT_DOMAIN ),
+            'countZero'    => __( 'No images without alt text were found.', PWATG::TEXT_DOMAIN ),
+            'countUpdated' => __( 'Count updated.', PWATG::TEXT_DOMAIN ),
           ],
         ]
       );

@@ -53,6 +53,41 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       return array_map( 'absint', get_posts( $args ) );
     }
 
+    /** Return how many attachments currently lack alt text. */
+    public function count_missing_alt_attachments() {
+      $query = new WP_Query(
+        [
+          'post_type'              => 'attachment',
+          'post_status'            => 'inherit',
+          'post_mime_type'         => 'image',
+          'posts_per_page'         => 1,
+          'fields'                 => 'ids',
+          'orderby'                => 'date',
+          'order'                  => 'DESC',
+          'no_found_rows'          => false,
+          'update_post_term_cache' => false,
+          'update_post_meta_cache' => false,
+          'meta_query'             => [
+            'relation' => 'OR',
+            [
+              'key'     => PWATG::META_KEY_ALT_TEXT,
+              'compare' => 'NOT EXISTS',
+            ],
+            [
+              'key'     => PWATG::META_KEY_ALT_TEXT,
+              'value'   => '',
+              'compare' => '=',
+            ],
+          ],
+        ]
+      );
+
+      $count = (int) $query->found_posts;
+      wp_reset_postdata();
+
+      return $count;
+    }
+
     /**
      * Process a slice of attachment IDs and return structured progress data.
      *
@@ -136,6 +171,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         'next_offset' => $next_offset,
         'done'        => $halted ? true : ( $next_offset >= $total ),
         'halted'      => $halted,
+        'missing' => $this->count_missing_alt_attachments(),
       ];
 
       if ( $halted ) {

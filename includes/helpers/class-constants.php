@@ -44,6 +44,7 @@ class PWATG {
   const AJAX_GENERATE_BULK = 'pwatg_generate_bulk';
   const AJAX_INIT_BULK = 'pwatg_bulk_init';
   const AJAX_TEST_PROVIDER = 'pwatg_test_provider';
+  const AJAX_SCAN_MISSING = 'pwatg_scan_missing_alt';
   
   // Meta Keys
   const META_KEY_ALT_TEXT = '_wp_attachment_image_alt';
