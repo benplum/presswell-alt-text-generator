@@ -8,6 +8,8 @@ if ( file_exists( $composer_autoload ) ) {
   require_once $composer_autoload;
 }
 
+require_once __DIR__ . '/helpers/class-pwatg-test-provider.php';
+
 if ( ! defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' ) ) {
   $polyfills_path = dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills';
   if ( file_exists( $polyfills_path . '/phpunitpolyfills-autoload.php' ) ) {
