@@ -405,9 +405,9 @@ trait PWATG_Media_Trait {
     }
 
     if ( ! empty( $_GET['page'] ) && PWATG::SETTINGS_PAGE_SLUG === $_GET['page'] ) {
-      $test_notice = get_transient( PWATG::NOTICE_KEY_TEST_PROVIDER );
+      $test_notice = get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
       if ( is_array( $test_notice ) && isset( $test_notice['message'] ) ) {
-        delete_transient( PWATG::NOTICE_KEY_TEST_PROVIDER );
+        delete_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
         $class = ( isset( $test_notice['type'] ) && 'success' === $test_notice['type'] ) ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
         echo $this->render_view_to_string(
           'admin-notice.php',
@@ -423,12 +423,12 @@ trait PWATG_Media_Trait {
       return;
     }
 
-    $notice = get_transient( PWATG::NOTICE_KEY_BULK );
+    $notice = get_transient( PWATG::TRANSIENT_NOTICE_BULK );
     if ( ! is_array( $notice ) ) {
       return;
     }
 
-    delete_transient( PWATG::NOTICE_KEY_BULK );
+    delete_transient( PWATG::TRANSIENT_NOTICE_BULK );
 
     $message = sprintf(
       /* translators: 1: processed count, 2: updated count, 3: failed count */

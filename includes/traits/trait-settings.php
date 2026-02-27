@@ -336,12 +336,12 @@ trait PWATG_Settings_Trait {
 
     if ( '' === $service || '' === $model || '' === $api_key ) {
       set_transient(
-        PWATG::NOTICE_KEY_TEST_PROVIDER,
+        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
           'type'    => 'error',
           'message' => __( 'Service, model, and API key are required to test the connection.', PWATG::TEXT_DOMAIN ),
         ],
-        60
+        PWATG::TRANSIENT_NOTICE_TTL
       );
 
       wp_safe_redirect( PWATG::SETTINGS_PAGE_URL );
@@ -352,7 +352,7 @@ trait PWATG_Settings_Trait {
 
     if ( is_wp_error( $result ) ) {
       set_transient(
-        PWATG::NOTICE_KEY_TEST_PROVIDER,
+        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
           'type'    => 'error',
           'message' => sprintf(
@@ -361,7 +361,7 @@ trait PWATG_Settings_Trait {
             $result->get_error_message()
           ),
         ],
-        60
+        PWATG::TRANSIENT_NOTICE_TTL
       );
     } else {
       $response_text = sanitize_text_field( (string) $result );
@@ -379,12 +379,12 @@ trait PWATG_Settings_Trait {
       }
 
       set_transient(
-        PWATG::NOTICE_KEY_TEST_PROVIDER,
+        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
           'type'    => 'success',
           'message' => $message,
         ],
-        60
+        PWATG::TRANSIENT_NOTICE_TTL
       );
     }
 

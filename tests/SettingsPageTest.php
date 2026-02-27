@@ -19,7 +19,7 @@ class SettingsPageTest extends WP_UnitTestCase {
   protected function tearDown(): void {
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     remove_filter( 'wp_redirect', [ $this, 'intercept_redirect' ], 10 );
-    delete_transient( PWATG::NOTICE_KEY_TEST_PROVIDER );
+    delete_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
     parent::tearDown();
   }
 
@@ -49,7 +49,7 @@ class SettingsPageTest extends WP_UnitTestCase {
       $this->assertSame( 'redirect', $e->getMessage() );
     }
 
-    $notice = get_transient( PWATG::NOTICE_KEY_TEST_PROVIDER );
+    $notice = get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
     $this->assertNotEmpty( $notice );
     $this->assertSame( 'success', $notice['type'] );
     $this->assertStringContainsString( 'Connection successful', $notice['message'] );

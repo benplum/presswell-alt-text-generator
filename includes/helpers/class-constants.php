@@ -23,10 +23,25 @@ class PWATG {
   const BULK_PAGE_SLUG = 'presswell-alt-text-bulk-generator';
   const BULK_PAGE_URL = 'upload.php?page=' . self::BULK_PAGE_SLUG;
   const BULK_PAGE_SCREEN_ID = 'media_page_' . self::BULK_PAGE_SLUG;
+
+  // Assets
+  const ASSET_HANDLE_ADMIN_CSS = 'pwatg-css-admin';
+  const ASSET_HANDLE_SETTINGS_JS = 'pwatg-js-settings';
+  const ASSET_HANDLE_BULK_CSS = 'pwatg-css-bulk';
+  const ASSET_HANDLE_BULK_JS = 'pwatg-js-bulk';
+  const ASSET_HANDLE_MEDIA_JS = 'pwatg-js-media';
+
+  // Localized JS objects
+  const JS_OBJECT_SETTINGS = 'pwatgSettingsData';
+  const JS_OBJECT_BULK = 'pwatgBulkData';
+  const JS_OBJECT_MEDIA = 'pwatgMediaData';
   
-  // Notices
-  const NOTICE_KEY_BULK = 'pwatg_bulk_notice';
-  const NOTICE_KEY_TEST_PROVIDER = 'pwatg_test_provider_notice';
+  // Transient notices
+  const TRANSIENT_NOTICE_BULK = 'pwatg_bulk_notice';
+  const TRANSIENT_NOTICE_TEST_PROVIDER = 'pwatg_test_provider_notice';
+  const TRANSIENT_NOTICE_TTL = 60;
+  const NOTICE_KEY_BULK = self::TRANSIENT_NOTICE_BULK;
+  const NOTICE_KEY_TEST_PROVIDER = self::TRANSIENT_NOTICE_TEST_PROVIDER;
 
   // Nonces
   const NONCE_GENERATE_SINGLE = 'pwatg_generate_single_';

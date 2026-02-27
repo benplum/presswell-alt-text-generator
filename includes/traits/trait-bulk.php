@@ -165,13 +165,13 @@ trait PWATG_Bulk_Trait {
     $results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing, $run_test ? 5 : 0, $run_test );
 
     set_transient(
-      PWATG::NOTICE_KEY_BULK,
+      PWATG::TRANSIENT_NOTICE_BULK,
       [
         'processed' => $results['processed'],
         'updated'   => $results['updated'],
         'failed'    => $results['failed'],
       ],
-      60
+      PWATG::TRANSIENT_NOTICE_TTL
     );
 
     wp_safe_redirect( PWATG::BULK_PAGE_URL );

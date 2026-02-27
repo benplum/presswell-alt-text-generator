@@ -26,7 +26,7 @@ trait PWATG_Assets_Trait {
     $should_enqueue_admin_css = $this->is_settings_page( $hook_suffix ) || current_user_can( 'upload_files' );
     if ( $should_enqueue_admin_css ) {
       wp_enqueue_style(
-        'pwatg-css-admin',
+        PWATG::ASSET_HANDLE_ADMIN_CSS,
         $this->get_asset_url( 'css/admin.css' ),
         [],
         PWATG::VERSION
@@ -42,7 +42,7 @@ trait PWATG_Assets_Trait {
       }
 
       wp_enqueue_script(
-        'pwatg-js-settings',
+        PWATG::ASSET_HANDLE_SETTINGS_JS,
         $this->get_asset_url( 'js/settings.js' ),
         [],
         PWATG::VERSION,
@@ -50,8 +50,8 @@ trait PWATG_Assets_Trait {
       );
 
       wp_localize_script(
-        'pwatg-js-settings',
-        'pwatgSettingsData',
+        PWATG::ASSET_HANDLE_SETTINGS_JS,
+        PWATG::JS_OBJECT_SETTINGS,
         [
           'optionKey'    => PWATG::SETTINGS_KEY,
           'modelMap'     => $model_map,
@@ -63,14 +63,14 @@ trait PWATG_Assets_Trait {
     if ( $this->is_bulk_page( $hook_suffix ) ) {
       $missing_count = $this->get_missing_alt_count();
       wp_enqueue_style(
-        'pwatg-css-bulk',
+        PWATG::ASSET_HANDLE_BULK_CSS,
         $this->get_asset_url( 'css/bulk.css' ),
         [],
         PWATG::VERSION
       );
 
       wp_enqueue_script(
-        'pwatg-js-bulk',
+        PWATG::ASSET_HANDLE_BULK_JS,
         $this->get_asset_url( 'js/bulk.js' ),
         [ 'jquery' ],
         PWATG::VERSION,
@@ -78,8 +78,8 @@ trait PWATG_Assets_Trait {
       );
 
       wp_localize_script(
-        'pwatg-js-bulk',
-        'pwatgBulkData',
+        PWATG::ASSET_HANDLE_BULK_JS,
+        PWATG::JS_OBJECT_BULK,
         [
           'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
           'ajaxAction' => PWATG::AJAX_GENERATE_BULK,
@@ -124,7 +124,7 @@ trait PWATG_Assets_Trait {
       }
 
       wp_enqueue_script(
-        'pwatg-js-media',
+        PWATG::ASSET_HANDLE_MEDIA_JS,
         $this->get_asset_url( 'js/media.js' ),
         [ 'jquery' ],
         PWATG::VERSION,
@@ -132,8 +132,8 @@ trait PWATG_Assets_Trait {
       );
 
       wp_localize_script(
-        'pwatg-js-media',
-        'pwatgMediaData',
+        PWATG::ASSET_HANDLE_MEDIA_JS,
+        PWATG::JS_OBJECT_MEDIA,
         [
           'inlineUrl'  => $inline_url,
           'inlineLast' => $inline_last,
