@@ -52,6 +52,13 @@ if ( ! defined( 'ABSPATH' ) ) {
   </p>
 
   <p>
+    <label>
+      <input type="checkbox" id="pwatg_run_test" value="1" />
+      <?php echo esc_html__( 'Test run (generates first 5 results)', PWATG::TEXT_DOMAIN ); ?>
+    </label>
+  </p>
+
+  <p>
     <button type="button" class="button button-primary" id="pwatg_start_bulk"><?php echo esc_html__( 'Run Bulk Generation', PWATG::TEXT_DOMAIN ); ?></button>
   </p>
 

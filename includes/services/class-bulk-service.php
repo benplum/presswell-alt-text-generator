@@ -21,21 +21,25 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
      * Fetch attachment IDs filtered by whether they already contain alt text.
      *
      * @param bool $regenerate_existing Include attachments that already have alt text.
+     * @param int  $limit               Optional maximum number of attachments to return.
+     * @param bool $force_missing_only  Ignore $regenerate_existing and only return missing alt text.
      *
      * @return int[]
      */
-    public function get_attachment_ids( $regenerate_existing ) {
+    public function get_attachment_ids( $regenerate_existing, $limit = 0, $force_missing_only = false ) {
       $args = [
         'post_type'      => 'attachment',
         'post_status'    => 'inherit',
         'post_mime_type' => 'image',
-        'posts_per_page' => -1,
+        'posts_per_page' => $limit > 0 ? absint( $limit ) : -1,
         'fields'         => 'ids',
         'orderby'        => 'ID',
         'order'          => 'DESC',
       ];
 
-      if ( ! $regenerate_existing ) {
+      $should_filter_missing = $force_missing_only || ! $regenerate_existing;
+
+      if ( $should_filter_missing ) {
         $args['meta_query'] = [
           'relation' => 'OR',
           [
@@ -187,11 +191,13 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
      * Sequential fallback handler when the bulk UI submits traditionally.
      *
      * @param bool $regenerate_existing Whether to overwrite existing alt text.
+     * @param int  $limit               Optional maximum number of attachments to process.
+     * @param bool $force_missing_only  Ignore $regenerate_existing and only process missing alt text.
      *
      * @return array
      */
-    public function run_bulk_generation( $regenerate_existing ) {
-      $attachment_ids = $this->get_attachment_ids( $regenerate_existing );
+    public function run_bulk_generation( $regenerate_existing, $limit = 0, $force_missing_only = false ) {
+      $attachment_ids = $this->get_attachment_ids( $regenerate_existing, $limit, $force_missing_only );
 
       $processed = 0;
       $updated   = 0;

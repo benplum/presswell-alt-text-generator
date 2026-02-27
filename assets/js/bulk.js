@@ -10,6 +10,7 @@ jQuery(function($) {
   const progressBar = $('#pwatg_progress_bar');
   const progressText = $('#pwatg_progress_text');
   const regenerateInput = $('#pwatg_regenerate_existing');
+  const runTestInput = $('#pwatg_run_test');
   const resultsTable = $('#pwatg_results_table');
   const resultsBody = $('#pwatg_results_body');
   const missingCount = $('#pwatg_missing_count');
@@ -159,7 +160,8 @@ jQuery(function($) {
       ids: ids,
       offset: offset,
       batch_size: batchSize,
-      regenerate_existing: regenerateInput.is(':checked') ? 1 : 0
+      regenerate_existing: regenerateInput.is(':checked') ? 1 : 0,
+      run_test: runTestInput.is(':checked') ? 1 : 0
     }).done(function(response) {
       if (!response || !response.success) {
         const message = response && response.data && response.data.message ? response.data.message : t('batchFailed', 'Batch request failed.');
@@ -218,7 +220,8 @@ jQuery(function($) {
     $.post(ajaxurl, {
       action: ajaxInitAction,
       nonce: getNonce(),
-      regenerate_existing: regenerateInput.is(':checked') ? 1 : 0
+      regenerate_existing: regenerateInput.is(':checked') ? 1 : 0,
+      run_test: runTestInput.is(':checked') ? 1 : 0
     }).done(function(response) {
       if (!response || !response.success) {
         const message = response && response.data && response.data.message ? response.data.message : t('initFailed', 'Could not initialize bulk generation.');

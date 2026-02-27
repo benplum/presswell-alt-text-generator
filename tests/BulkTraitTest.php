@@ -80,6 +80,33 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $this->assertSame( 1, $response['data']['total'] );
   }
 
+  public function test_bulk_init_ajax_run_test_limits_to_missing_subset() {
+    $attachments = [];
+    for ( $i = 0; $i < 6; $i++ ) {
+      $attachments[] = $this->create_image_attachment();
+    }
+
+    update_post_meta( $attachments[0], PWATG::META_KEY_ALT_TEXT, 'existing alt' );
+
+    $_POST = [
+      'nonce'                => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_test'             => 1,
+      'regenerate_existing'  => 1,
+    ];
+
+    try {
+      $this->_handleAjax( PWATG::AJAX_INIT_BULK );
+    } catch ( WPAjaxDieContinueException $e ) {
+      // Expected.
+    }
+
+    $response = json_decode( $this->_last_response, true );
+    $this->assertTrue( $response['success'] );
+    $this->assertSame( 5, $response['data']['total'] );
+    $this->assertCount( 5, $response['data']['ids'] );
+    $this->assertNotContains( $attachments[0], $response['data']['ids'] );
+  }
+
   public function test_bulk_init_ajax_respects_rate_limit_lock() {
     $this->simulate_rate_limit_lock();
     $_POST = [

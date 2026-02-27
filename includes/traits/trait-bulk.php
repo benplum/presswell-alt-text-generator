@@ -58,8 +58,10 @@ trait PWATG_Bulk_Trait {
       );
     }
 
-    $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
-    $ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing );
+    $run_test            = ! empty( $_POST['run_test'] );
+    $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
+    $limit               = $run_test ? 5 : 0;
+    $ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing, $limit, $run_test );
 
     wp_send_json_success(
       [
@@ -88,10 +90,15 @@ trait PWATG_Bulk_Trait {
       );
     }
 
-    $raw_ids            = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
-    $offset             = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
-    $batch_size         = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
-    $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
+    $raw_ids             = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
+    $offset              = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
+    $batch_size          = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
+    $run_test            = ! empty( $_POST['run_test'] );
+    $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
+
+    if ( $run_test ) {
+      $raw_ids = array_slice( $raw_ids, 0, 5 );
+    }
 
     $results = $this->get_bulk_service()->process_batch( $raw_ids, $offset, $batch_size, $regenerate_existing );
     $this->missing_alt_count_cache = $results['missing'];
@@ -153,8 +160,9 @@ trait PWATG_Bulk_Trait {
       wp_die( esc_html( $lock['message'] ) );
     }
 
-    $regenerate_existing = ! empty( $_POST['regenerate_existing'] );
-    $results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing );
+    $run_test            = ! empty( $_POST['run_test'] );
+    $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
+    $results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing, $run_test ? 5 : 0, $run_test );
 
     set_transient(
       PWATG::NOTICE_KEY_BULK,
