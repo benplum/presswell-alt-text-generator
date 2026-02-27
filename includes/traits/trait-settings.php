@@ -198,14 +198,18 @@ trait PWATG_Settings_Trait {
         'gpt-4.1-mini' => 'gpt-4.1-mini',
         'gpt-4.1'      => 'gpt-4.1',
         'gpt-4o-mini'  => 'gpt-4o-mini',
+        'gpt-4o'       => 'gpt-4o',
       ],
       'anthropic' => [
-        'claude-3-5-haiku-latest'  => 'claude-3-5-haiku-latest',
-        'claude-3-7-sonnet-latest' => 'claude-3-7-sonnet-latest',
+        'claude-3-5-haiku-20241022'  => 'claude-3-5-haiku-20241022',
+        'claude-3-5-sonnet-20240620' => 'claude-3-5-sonnet-20240620',
+        'claude-3-opus-20240229'     => 'claude-3-opus-20240229',
       ],
       'gemini' => [
-        'gemini-2.0-flash' => 'gemini-2.0-flash',
-        'gemini-1.5-flash' => 'gemini-1.5-flash',
+        'gemini-2.0-flash'      => 'gemini-2.0-flash',
+        'gemini-2.0-flash-lite' => 'gemini-2.0-flash-lite',
+        'gemini-1.5-flash'      => 'gemini-1.5-flash',
+        'gemini-1.5-pro'        => 'gemini-1.5-pro',
       ],
     ];
 
