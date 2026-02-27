@@ -15,7 +15,69 @@ trait PWATG_Media_Trait {
     add_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation_ajax' ] );
     add_filter( 'media_row_actions', [ $this, 'add_media_row_action' ], 10, 2 );
     add_filter( 'attachment_fields_to_edit', [ $this, 'add_media_modal_action_field' ], 10, 2 );
+    add_filter( 'manage_upload_columns', [ $this, 'add_media_alt_column' ] );
+    add_action( 'manage_media_custom_column', [ $this, 'render_media_alt_column' ], 10, 2 );
     add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
+  }
+
+  /** Inject the Alt Text column into the Media Library list table. */
+  public function add_media_alt_column( $columns ) {
+    if ( ! is_array( $columns ) ) {
+      return $columns;
+    }
+
+    $injected = [];
+    $inserted = false;
+
+    foreach ( $columns as $key => $label ) {
+      $injected[ $key ] = $label;
+
+      if ( 'title' === $key ) {
+        $injected[ PWATG::MEDIA_COLUMN_ALT ] = __( 'Alt Text', PWATG::TEXT_DOMAIN );
+        $inserted = true;
+      }
+    }
+
+    if ( ! $inserted ) {
+      $injected[ PWATG::MEDIA_COLUMN_ALT ] = __( 'Alt Text', PWATG::TEXT_DOMAIN );
+    }
+
+    return $injected;
+  }
+
+  /** Output the Alt Text preview for Media Library rows. */
+  public function render_media_alt_column( $column, $post_id ) {
+    if ( PWATG::MEDIA_COLUMN_ALT !== $column ) {
+      return;
+    }
+
+    if ( ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $post_id ) ) {
+      echo '&mdash;';
+      return;
+    }
+
+    if ( ! wp_attachment_is_image( $post_id ) ) {
+      echo '&mdash;';
+      return;
+    }
+
+    $alt_text = trim( (string) get_post_meta( $post_id, PWATG::META_KEY_ALT_TEXT, true ) );
+
+    $action_url = $this->get_single_action_url( $post_id );
+    echo '<div class="pwatg-alt-preview-container">';
+
+    if ( '' === $alt_text ) {
+      echo '<span class="pwatg-alt-preview is-empty">';
+      echo '</span>';
+    } else {
+      echo '<span class="pwatg-alt-preview">' . esc_html( $alt_text ) . '</span>';
+    }
+    
+    echo '<a class="pwatg-generate-alt-action" href="' . esc_url( $action_url ) . '" data-attachment-id="' . esc_attr( $post_id ) . '" data-has-alt="' . ( '' === $alt_text ? '0' : '1' ) . '">';
+    echo '' === $alt_text ? esc_html__( 'Generate Alt Text', PWATG::TEXT_DOMAIN ) : esc_html__( 'Regenerate Alt Text', PWATG::TEXT_DOMAIN );
+    echo '</a>';
+
+    echo '</div>';
   }
 
   /**

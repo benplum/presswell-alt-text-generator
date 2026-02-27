@@ -35,6 +35,70 @@ jQuery(function($) {
     $button.attr('data-has-alt', hasAlt ? '1' : '0');
   }
 
+  function updatePreviewAfterSuccess($button, altText) {
+    if (typeof altText !== 'string' || !altText.trim()) {
+      return;
+    }
+
+    let container = $button.closest('.pwatg-alt-preview-container');
+    if (!container.length) {
+      container = $button.closest('tr').find('.pwatg-alt-preview-container').first();
+    }
+    if (!container.length) {
+      return;
+    }
+
+    const preview = container.find('.pwatg-alt-preview').first();
+    if (!preview.length) {
+      return;
+    }
+
+    preview.removeClass('is-empty');
+    preview.text(altText.trim());
+
+    let actions = container.find('.pwatg-alt-preview-actions').first();
+    if (!actions.length) {
+      actions = container;
+    }
+
+    let regenerateLink = actions.find('.pwatg-generate-alt-action').first();
+    if (!regenerateLink.length) {
+      regenerateLink = $('<a class="pwatg-generate-alt-action" />');
+      actions.append(regenerateLink);
+    }
+
+    regenerateLink
+      .attr('data-has-alt', '1')
+      .text(t('regenerateButton', 'Regenerate Alt Text'));
+  }
+
+  function syncActionLinksAfterSuccess($button, hasAlt) {
+    const label = getActionLabel(!!hasAlt);
+    const attachmentId = parseInt($button.attr('data-attachment-id') || '0', 10);
+    let links = $();
+
+    const row = $button.closest('tr');
+    if (row.length) {
+      links = row.find('.pwatg-generate-alt-action');
+    }
+
+    if (!links.length && attachmentId) {
+      links = $('.pwatg-generate-alt-action').filter(function() {
+        return parseInt($(this).attr('data-attachment-id') || '0', 10) === attachmentId;
+      });
+    }
+
+    if (!links.length) {
+      return;
+    }
+
+    links.each(function() {
+      const link = $(this);
+      writeHasAltToButton(link, hasAlt);
+      link.text(label);
+    });
+  }
+
   function getActionDataFromCompat(scope) {
     const compat = scope && scope.length ? scope : $(document.body);
     const row = compat.find(compatRowSelector + ':visible, ' + compatRowSelector).first();
@@ -235,9 +299,12 @@ jQuery(function($) {
           $altInput.val(payload.alt_text);
           $altInput.trigger('change');
         }
+
+        updatePreviewAfterSuccess($button, payload.alt_text);
       }
 
       writeHasAltToButton($button, hasAlt);
+      syncActionLinksAfterSuccess($button, hasAlt);
 
       setLastGeneratedForButton($button, payload.last_generated || t('never', 'Never'));
     }).fail(function(xhr) {

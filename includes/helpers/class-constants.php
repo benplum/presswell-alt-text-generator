@@ -52,6 +52,7 @@ class PWATG {
 
   // Field Keys
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';
+  const MEDIA_COLUMN_ALT = 'pwatg_alt_text';
   
   // AI Providers  
   const PROVIDER_OPENAI = 'openai';

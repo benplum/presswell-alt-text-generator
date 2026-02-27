@@ -64,6 +64,44 @@ class MediaTraitTest extends WP_UnitTestCase {
     $this->assertSame( 'Auto alt text', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
   }
 
+  public function test_media_alt_column_is_injected() {
+    $columns = [ 'cb' => '<input type="checkbox" />', 'title' => 'Title' ];
+    $filtered = $this->plugin->add_media_alt_column( $columns );
+
+    $this->assertArrayHasKey( PWATG::MEDIA_COLUMN_ALT, $filtered );
+    $this->assertSame( __( 'Alt Text', PWATG::TEXT_DOMAIN ), $filtered[ PWATG::MEDIA_COLUMN_ALT ] );
+  }
+
+  public function test_media_alt_column_renders_alt_text_preview() {
+    $user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+    wp_set_current_user( $user_id );
+
+    $attachment_id = $this->create_image_attachment();
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'Preview alt text contents' );
+
+    ob_start();
+    $this->plugin->render_media_alt_column( PWATG::MEDIA_COLUMN_ALT, $attachment_id );
+    $output = ob_get_clean();
+
+    $this->assertStringContainsString( 'Preview alt text contents', $output );
+    $this->assertStringContainsString( 'Regenerate', $output );
+  }
+
+  public function test_media_alt_column_renders_generate_link_when_empty() {
+    $user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+    wp_set_current_user( $user_id );
+
+    $attachment_id = $this->create_image_attachment();
+    delete_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT );
+
+    ob_start();
+    $this->plugin->render_media_alt_column( PWATG::MEDIA_COLUMN_ALT, $attachment_id );
+    $output = ob_get_clean();
+
+    $this->assertStringContainsString( 'pwatg-generate-alt-action', $output );
+    $this->assertStringContainsString( 'Generate Alt Text', $output );
+  }
+
   protected function seed_settings() {
     $defaults = $this->plugin->get_default_settings();
     $defaults['api_keys']['openai'] = 'sk-test';
