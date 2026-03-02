@@ -1,6 +1,11 @@
 {
     "name": "presswell/presswell-alt-text-generator",
     "type": "wordpress-plugin",
+    "scripts": {
+        "phpunit": "vendor/bin/phpunit",
+        "phpunit:file": "vendor/bin/phpunit",
+        "phpunit:filter": "vendor/bin/phpunit"
+    },
     "require": {
     },
     "require-dev": {
