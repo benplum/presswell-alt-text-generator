@@ -165,7 +165,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
   protected function seed_settings() {
     $defaults = $this->plugin->get_default_settings();
     $defaults['api_keys']['openai'] = 'sk-test';
-    $defaults['auto_generate'] = 0;
+    $defaults['auto_generate'] = '';
     update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 

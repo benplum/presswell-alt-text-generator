@@ -56,7 +56,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     PWATG_Test_Provider::$response = 'Auto alt text';
 
     $settings = $this->plugin->get_settings();
-    $settings['auto_generate'] = 1;
+    $settings['auto_generate'] = 'on';
     update_option( PWATG::SETTINGS_KEY, $settings );
 
     $this->plugin->maybe_generate_on_upload_from_metadata( [], $attachment_id );
@@ -107,7 +107,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $defaults['api_keys']['openai'] = 'sk-test';
     $defaults['api_keys']['anthropic'] = '';
     $defaults['api_keys']['gemini'] = '';
-    $defaults['auto_generate'] = 0;
+    $defaults['auto_generate'] = '';
     update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 

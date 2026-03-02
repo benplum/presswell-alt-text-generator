@@ -238,17 +238,36 @@ trait PWATG_Providers_Trait {
    */
   public function generate_alt_text_for_attachment( $attachment_id, $force_regenerate = false ) {
     $attachment_id = absint( $attachment_id );
+    $this->debug_log(
+      'Starting alt text generation for attachment.',
+      [
+        'attachment_id'     => $attachment_id,
+        'force_regenerate'  => (bool) $force_regenerate,
+      ]
+    );
+
     if ( ! $attachment_id || ! wp_attachment_is_image( $attachment_id ) ) {
-      return new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', PWATG::TEXT_DOMAIN ) );
+      $this->debug_log( 'Alt generation failed: invalid attachment.', [ 'attachment_id' => $attachment_id ] );
+      return $error;
     }
 
     $lock_error = $this->get_rate_limit_block_error();
     if ( $lock_error ) {
+      $this->debug_log(
+        'Alt generation blocked by rate limit lock.',
+        [
+          'attachment_id' => $attachment_id,
+          'code'          => $lock_error->get_error_code(),
+          'message'       => $lock_error->get_error_message(),
+        ]
+      );
       return $lock_error;
     }
 
     $current_alt = trim( (string) get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
     if ( ! $force_regenerate && '' !== $current_alt ) {
+      $this->debug_log( 'Alt generation skipped because alt text already exists.', [ 'attachment_id' => $attachment_id ] );
       return false;
     }
 
@@ -290,8 +309,19 @@ trait PWATG_Providers_Trait {
     $service     = isset( $settings['service'] ) ? sanitize_key( $settings['service'] ) : 'openai';
     $model       = isset( $settings['model'] ) ? trim( (string) $settings['model'] ) : '';
 
+    $this->debug_log(
+      'Prepared provider request context for attachment.',
+      [
+        'attachment_id' => $attachment_id,
+        'service'       => $service,
+        'model'         => $model,
+      ]
+    );
+
     if ( '' === $model ) {
-      return new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', PWATG::TEXT_DOMAIN ) );
+      $this->debug_log( 'Alt generation failed: missing model.', [ 'attachment_id' => $attachment_id ] );
+      return $error;
     }
 
     $api_key = '';
@@ -304,19 +334,33 @@ trait PWATG_Providers_Trait {
     }
 
     if ( '' === $api_key ) {
-      return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ) );
+      $this->debug_log( 'Alt generation failed: missing API key.', [ 'attachment_id' => $attachment_id, 'service' => $service ] );
+      return $error;
     }
 
     $alt_text = PWATG_Provider_Registry::request_alt_text( $service, $api_key, $model, $full_prompt, $mime_type, $image_binary );
 
     if ( is_wp_error( $alt_text ) ) {
       $this->maybe_start_rate_limit_lock( $alt_text );
+      $this->debug_log(
+        'Provider request returned an error.',
+        [
+          'attachment_id' => $attachment_id,
+          'service'       => $service,
+          'model'         => $model,
+          'code'          => $alt_text->get_error_code(),
+          'message'       => $alt_text->get_error_message(),
+        ]
+      );
       return $alt_text;
     }
 
     $alt_text = sanitize_text_field( $alt_text );
     if ( '' === $alt_text ) {
-      return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', PWATG::TEXT_DOMAIN ) );
+      $this->debug_log( 'Provider returned empty alt text.', [ 'attachment_id' => $attachment_id, 'service' => $service, 'model' => $model ] );
+      return $error;
     }
 
     if ( mb_strlen( $alt_text ) > 220 ) {
@@ -325,6 +369,16 @@ trait PWATG_Providers_Trait {
 
     update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, $alt_text );
     update_post_meta( $attachment_id, PWATG::META_KEY_LAST_GENERATED, (string) current_time( 'timestamp', true ) );
+
+    $this->debug_log(
+      'Alt text generation completed successfully.',
+      [
+        'attachment_id' => $attachment_id,
+        'service'       => $service,
+        'model'         => $model,
+        'alt_length'    => mb_strlen( $alt_text ),
+      ]
+    );
 
     return true;
   }

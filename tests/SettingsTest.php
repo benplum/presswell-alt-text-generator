@@ -21,11 +21,14 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertArrayHasKey( 'prompt_seed', $defaults );
     $this->assertArrayHasKey( 'api_keys', $defaults );
     $this->assertArrayHasKey( 'auto_generate', $defaults );
+    $this->assertArrayHasKey( 'debug_logging', $defaults );
 
     $this->assertSame( 'openai', $defaults['service'] );
     $this->assertSame( 'gpt-4.1-mini', $defaults['model'] );
     $this->assertIsArray( $defaults['api_keys'] );
     $this->assertArrayHasKey( 'openai', $defaults['api_keys'] );
+    $this->assertSame( 'on', $defaults['auto_generate'] );
+    $this->assertSame( '', $defaults['debug_logging'] );
   }
 
   public function test_get_settings_merges_saved_values_with_defaults() {
@@ -53,6 +56,7 @@ class SettingsTest extends WP_UnitTestCase {
       'model'         => 'not-a-real-model',
       'prompt_seed'   => '   ',
       'auto_generate' => '',
+      'debug_logging' => 'on',
       'api_keys'      => [
         'openai'    => 'ok-123',
         'anthropic' => 'anth-456',
@@ -64,7 +68,8 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertSame( 'openai', $sanitized['service'], 'Invalid services should fall back to the default.' );
     $this->assertSame( 'gpt-4.1-mini', $sanitized['model'], 'Invalid models should reset to the default option.' );
     $this->assertNotEmpty( $sanitized['prompt_seed'], 'Blank prompts should reset to the default seed.' );
-    $this->assertSame( 0, $sanitized['auto_generate'] );
+    $this->assertSame( '', $sanitized['auto_generate'] );
+    $this->assertSame( 'on', $sanitized['debug_logging'] );
     $this->assertSame( 'ok-123', $sanitized['api_keys']['openai'] );
     $this->assertSame( 'anth-456', $sanitized['api_keys']['anthropic'] );
   }

@@ -83,4 +83,77 @@ trait PWATG_Helpers_Trait {
   protected function get_asset_url( $relative_path ) {
     return $this->get_plugin_url( 'assets/' . ltrim( $relative_path, '/' ) );
   }
+
+  /**
+   * Determine whether debug logging is enabled in plugin settings.
+   *
+   * @return bool
+   */
+  protected function is_debug_logging_enabled() {
+    if ( ! method_exists( $this, 'get_settings' ) ) {
+      return false;
+    }
+
+    $settings = $this->get_settings();
+
+    return ! empty( $settings['debug_logging'] );
+  }
+
+  /**
+   * Write a debug log line when debug logging is enabled.
+   *
+   * @param string $message Human-readable log message.
+   * @param array  $context Optional structured context.
+   */
+  protected function debug_log( $message, array $context = [] ) {
+    if ( ! $this->is_debug_logging_enabled() || ! function_exists( 'error_log' ) ) {
+      return;
+    }
+
+    $line = '[PWATG] ' . sanitize_text_field( (string) $message );
+    if ( ! empty( $context ) ) {
+      $line .= ' ' . wp_json_encode( $this->sanitize_debug_log_value( $context ) );
+    }
+
+    error_log( $line );
+  }
+
+  /**
+   * Recursively sanitize and redact debug context values.
+   *
+   * @param mixed $value Raw context value.
+   *
+   * @return mixed
+   */
+  protected function sanitize_debug_log_value( $value ) {
+    if ( is_array( $value ) ) {
+      $sanitized = [];
+      foreach ( $value as $key => $item ) {
+        $clean_key = is_string( $key ) ? sanitize_key( $key ) : $key;
+        if ( is_string( $clean_key ) && preg_match( '/(api|key|token|secret|auth|password|binary)/i', $clean_key ) ) {
+          $sanitized[ $key ] = '[redacted]';
+          continue;
+        }
+
+        $sanitized[ $key ] = $this->sanitize_debug_log_value( $item );
+      }
+
+      return $sanitized;
+    }
+
+    if ( is_object( $value ) ) {
+      return $this->sanitize_debug_log_value( (array) $value );
+    }
+
+    if ( is_string( $value ) ) {
+      $value = sanitize_text_field( $value );
+      if ( mb_strlen( $value ) > 300 ) {
+        return mb_substr( $value, 0, 300 ) . '...';
+      }
+
+      return $value;
+    }
+
+    return $value;
+  }
 }

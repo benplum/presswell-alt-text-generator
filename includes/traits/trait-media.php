@@ -217,7 +217,10 @@ trait PWATG_Media_Trait {
   public function handle_single_generation() {
     $attachment_id = isset( $_REQUEST['attachment_id'] ) ? absint( $_REQUEST['attachment_id'] ) : 0;
 
+    $this->debug_log( 'Single generation request received.', [ 'attachment_id' => $attachment_id, 'transport' => 'admin_post' ] );
+
     if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
+      $this->debug_log( 'Single generation denied due to permissions.', [ 'attachment_id' => $attachment_id, 'transport' => 'admin_post' ] );
       wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
     }
 
@@ -233,6 +236,16 @@ trait PWATG_Media_Trait {
     } elseif ( is_wp_error( $result ) && 'pwatg_missing_api_key' === $result->get_error_code() ) {
       $status = 'missing_key';
     }
+
+    $this->debug_log(
+      'Single generation completed.',
+      [
+        'attachment_id' => $attachment_id,
+        'transport'     => 'admin_post',
+        'status'        => $status,
+        'error_code'    => is_wp_error( $result ) ? $result->get_error_code() : '',
+      ]
+    );
 
     $redirect_url = wp_get_referer();
     if ( ! $redirect_url ) {
@@ -255,7 +268,10 @@ trait PWATG_Media_Trait {
   public function handle_single_generation_ajax() {
     $attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
 
+    $this->debug_log( 'Single generation request received.', [ 'attachment_id' => $attachment_id, 'transport' => 'ajax' ] );
+
     if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
+      $this->debug_log( 'Single generation denied due to permissions.', [ 'attachment_id' => $attachment_id, 'transport' => 'ajax' ] );
       wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
     }
 
@@ -271,6 +287,16 @@ trait PWATG_Media_Trait {
     } elseif ( is_wp_error( $result ) && 'pwatg_missing_api_key' === $result->get_error_code() ) {
       $status = 'missing_key';
     }
+
+    $this->debug_log(
+      'Single generation completed.',
+      [
+        'attachment_id' => $attachment_id,
+        'transport'     => 'ajax',
+        'status'        => $status,
+        'error_code'    => is_wp_error( $result ) ? $result->get_error_code() : '',
+      ]
+    );
 
     $messages = [
       'updated'     => __( 'Alt text generated successfully.', PWATG::TEXT_DOMAIN ),

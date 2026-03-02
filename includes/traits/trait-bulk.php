@@ -63,6 +63,15 @@ trait PWATG_Bulk_Trait {
     $limit               = $run_test ? 5 : 0;
     $ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing, $limit, $run_test );
 
+    $this->debug_log(
+      'Bulk init request prepared attachment IDs.',
+      [
+        'run_test'            => (bool) $run_test,
+        'regenerate_existing' => (bool) $regenerate_existing,
+        'total'               => count( $ids ),
+      ]
+    );
+
     wp_send_json_success(
       [
         'ids'   => $ids,
@@ -102,6 +111,21 @@ trait PWATG_Bulk_Trait {
 
     $results = $this->get_bulk_service()->process_batch( $raw_ids, $offset, $batch_size, $regenerate_existing );
     $this->missing_alt_count_cache = $results['missing'];
+
+    $this->debug_log(
+      'Bulk generation batch processed.',
+      [
+        'offset'              => $offset,
+        'batch_size'          => $batch_size,
+        'run_test'            => (bool) $run_test,
+        'regenerate_existing' => (bool) $regenerate_existing,
+        'processed'           => isset( $results['processed'] ) ? (int) $results['processed'] : 0,
+        'updated'             => isset( $results['updated'] ) ? (int) $results['updated'] : 0,
+        'failed'              => isset( $results['failed'] ) ? (int) $results['failed'] : 0,
+        'next_offset'         => isset( $results['next_offset'] ) ? (int) $results['next_offset'] : 0,
+        'done'                => ! empty( $results['done'] ),
+      ]
+    );
 
     wp_send_json_success(
       [
@@ -163,6 +187,17 @@ trait PWATG_Bulk_Trait {
     $run_test            = ! empty( $_POST['run_test'] );
     $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
     $results             = $this->get_bulk_service()->run_bulk_generation( $regenerate_existing, $run_test ? 5 : 0, $run_test );
+
+    $this->debug_log(
+      'Bulk generation completed via admin-post fallback.',
+      [
+        'run_test'            => (bool) $run_test,
+        'regenerate_existing' => (bool) $regenerate_existing,
+        'processed'           => isset( $results['processed'] ) ? (int) $results['processed'] : 0,
+        'updated'             => isset( $results['updated'] ) ? (int) $results['updated'] : 0,
+        'failed'              => isset( $results['failed'] ) ? (int) $results['failed'] : 0,
+      ]
+    );
 
     set_transient(
       PWATG::TRANSIENT_NOTICE_BULK,

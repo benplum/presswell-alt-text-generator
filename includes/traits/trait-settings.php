@@ -72,6 +72,14 @@ trait PWATG_Settings_Trait {
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
     );
+
+    add_settings_field(
+      'debug_logging',
+      __( 'Debug Logging', PWATG::TEXT_DOMAIN ),
+      [ $this, 'render_debug_logging_field' ],
+      PWATG::SETTINGS_PAGE_SLUG,
+      'pwatg_main_section'
+    );
   }
 
   /**
@@ -89,7 +97,8 @@ trait PWATG_Settings_Trait {
       'service'       => isset( $input['service'] ) ? sanitize_key( $input['service'] ) : $defaults['service'],
       'model'         => isset( $input['model'] ) ? sanitize_text_field( $input['model'] ) : $defaults['model'],
       'prompt_seed'   => isset( $input['prompt_seed'] ) ? sanitize_textarea_field( $input['prompt_seed'] ) : $defaults['prompt_seed'],
-      'auto_generate' => ! empty( $input['auto_generate'] ) ? 1 : 0,
+      'auto_generate' => ! empty( $input['auto_generate'] ) ? 'on' : '',
+      'debug_logging' => ! empty( $input['debug_logging'] ) ? 'on' : '',
     ];
 
     $allowed_services = array_keys( $this->get_available_services() );
@@ -148,6 +157,9 @@ trait PWATG_Settings_Trait {
       $settings['api_keys']['openai'] = sanitize_text_field( $settings['api_key'] );
     }
 
+    $settings['auto_generate'] = ! empty( $settings['auto_generate'] ) ? 'on' : '';
+    $settings['debug_logging'] = ! empty( $settings['debug_logging'] ) ? 'on' : '';
+
     return $settings;
   }
 
@@ -162,7 +174,8 @@ trait PWATG_Settings_Trait {
         'anthropic' => '',
         'gemini'    => '',
       ],
-      'auto_generate' => 1,
+      'auto_generate' => 'on',
+      'debug_logging' => '',
     ];
   }
 
@@ -308,8 +321,23 @@ trait PWATG_Settings_Trait {
     $settings = $this->get_settings();
     ?>
     <label>
-      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[auto_generate]" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?> />
+      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[auto_generate]" value="on" <?php checked( ! empty( $settings['auto_generate'] ) ); ?> />
       <?php echo esc_html__( 'Generate alt text automatically when an image is uploaded.', PWATG::TEXT_DOMAIN ); ?>
+    </label>
+    <?php
+  }
+
+  /** Output checkbox toggle for debug logging setting. */
+  public function render_debug_logging_field() {
+    $settings      = $this->get_settings();
+    $debug_log_url = content_url( 'debug.log' );
+    ?>
+    <label>
+      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[debug_logging]" value="on" <?php checked( ! empty( $settings['debug_logging'] ) ); ?> />
+      <?php echo esc_html__( 'Log plugin activity', PWATG::TEXT_DOMAIN ); ?>
+      <?php if ( ! empty( $settings['debug_logging'] ) ) : ?>
+      <a href="<?php echo esc_url( $debug_log_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'View logs', PWATG::TEXT_DOMAIN ); ?></a>
+      <?php endif; ?>
     </label>
     <?php
   }
@@ -334,7 +362,17 @@ trait PWATG_Settings_Trait {
     $model   = isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '';
     $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
 
+    $this->debug_log(
+      'Testing provider connection.',
+      [
+        'service'        => $service,
+        'model'          => $model,
+        'has_api_key'    => '' !== $api_key,
+      ]
+    );
+
     if ( '' === $service || '' === $model || '' === $api_key ) {
+      $this->debug_log( 'Provider connection test rejected due to missing parameters.', [ 'service' => $service, 'model' => $model ] );
       set_transient(
         PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
@@ -351,6 +389,15 @@ trait PWATG_Settings_Trait {
     $result = $this->test_provider_connection( $service, $api_key, $model );
 
     if ( is_wp_error( $result ) ) {
+      $this->debug_log(
+        'Provider connection test failed.',
+        [
+          'service' => $service,
+          'model'   => $model,
+          'code'    => $result->get_error_code(),
+          'message' => $result->get_error_message(),
+        ]
+      );
       set_transient(
         PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
@@ -364,6 +411,7 @@ trait PWATG_Settings_Trait {
         PWATG::TRANSIENT_NOTICE_TTL
       );
     } else {
+      $this->debug_log( 'Provider connection test succeeded.', [ 'service' => $service, 'model' => $model ] );
       $response_text = sanitize_text_field( (string) $result );
       if ( '' !== $response_text && mb_strlen( $response_text ) > 120 ) {
         $response_text = mb_substr( $response_text, 0, 120 ) . '...';

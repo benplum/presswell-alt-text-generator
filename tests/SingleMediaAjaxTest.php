@@ -110,7 +110,7 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $defaults['api_keys']['openai'] = 'sk-test';
     $defaults['api_keys']['anthropic'] = '';
     $defaults['api_keys']['gemini'] = '';
-    $defaults['auto_generate'] = 0;
+    $defaults['auto_generate'] = '';
     update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 
