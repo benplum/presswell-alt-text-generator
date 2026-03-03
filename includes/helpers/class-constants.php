@@ -12,7 +12,7 @@ class PWATG {
   const KEY = 'pwatg';
   const SETTINGS_KEY = 'pwatg_settings';
   const TEXT_DOMAIN = 'presswell-alt-text-generator';
-  const VERSION = '0.1.0';
+  const VERSION = '1.0.0';
   
   // Settings Page
   const SETTINGS_PAGE_SLUG = 'presswell-alt-text-generator';

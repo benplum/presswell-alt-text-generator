@@ -1,12 +1,28 @@
 <?php
 /**
- * Plugin Name: Presswell Alt Text Generator
- * Description: Generate AI-powered alt text for WordPress media.
- * Version: 0.1.0
- * Author: Ben Plum
- * License: GPLv2 or later
- * Text Domain: presswell-alt-text-generator
- */
+* Plugin Name: Presswell Alt Text Generator
+* Description: Generate AI-powered alt text for WordPress media.
+* Version: 1.0.0
+* Author: Ben Plum
+* License: GPLv2 or later
+* Text Domain: presswell-alt-text-generator
+*
+* @package Presswell Alt Text Generator
+* @author Presswell
+*
+* Presswell Alt Text Generator is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 2 of the License, or
+* any later version.
+*
+* Presswell Alt Text Generator is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Presswell Alt Text Generator. If not, see <http://www.gnu.org/licenses/>.
+*/
 
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
@@ -29,8 +45,6 @@ require_once __DIR__ . '/includes/services/class-bulk-service.php';
 if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
   /**
    * Bootstrap container for all Presswell Alt Text Generator features.
-   *
-   * @since 0.1.0
    */
   class Presswell_Alt_Text_Generator {
 	  use PWATG_Assets_Trait;
@@ -74,8 +88,6 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
     /**
      * Return the shared plugin instance.
      *
-     * @since 0.1.0
-     *
      * @return Presswell_Alt_Text_Generator
      */
     public static function instance() {
@@ -92,8 +104,6 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
 if ( ! function_exists( 'presswell_alt_text_generator' ) ) {
   /**
    * Helper to access the singleton instance from procedural code.
-   *
-   * @since 0.1.0
    *
    * @return Presswell_Alt_Text_Generator
    */
