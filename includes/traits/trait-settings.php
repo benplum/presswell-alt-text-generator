@@ -208,21 +208,27 @@ trait PWATG_Settings_Trait {
     $service = sanitize_key( $service );
     $all_models = [
       'openai' => [
-        'gpt-4.1-mini' => 'gpt-4.1-mini',
-        'gpt-4.1'      => 'gpt-4.1',
-        'gpt-4o-mini'  => 'gpt-4o-mini',
-        'gpt-4o'       => 'gpt-4o',
+        'gpt-4o'         => 'gpt-4o',
+        'gpt-4-turbo'    => 'gpt-4-turbo',
+        'gpt-4.1'        => 'gpt-4.1',
+        'gpt-4.1-mini'   => 'gpt-4.1-mini',
+        'gpt-4o-mini'    => 'gpt-4o-mini',
+        // 'dalle-3'        => 'dalle-3',
       ],
       'anthropic' => [
-        'claude-3-5-haiku-20241022'  => 'claude-3-5-haiku-20241022',
-        'claude-3-5-sonnet-20240620' => 'claude-3-5-sonnet-20240620',
-        'claude-3-opus-20240229'     => 'claude-3-opus-20240229',
+        'claude-3-opus'     => 'claude-3-opus',
+        'claude-3-sonnet'   => 'claude-3-sonnet',
+        'claude-3-haiku'    => 'claude-3-haiku',
+        // 'claude-3-5-haiku-20241022'  => 'claude-3-5-haiku-20241022',
+        // 'claude-3-5-sonnet-20240620' => 'claude-3-5-sonnet-20240620',
+        // 'claude-3-opus-20240229'     => 'claude-3-opus-20240229',
       ],
       'gemini' => [
+        'gemini-1.5-pro'    => 'gemini-1.5-pro',
+        'gemini-1.5-flash'  => 'gemini-1.5-flash',
         'gemini-2.0-flash'      => 'gemini-2.0-flash',
         'gemini-2.0-flash-lite' => 'gemini-2.0-flash-lite',
-        'gemini-1.5-flash'      => 'gemini-1.5-flash',
-        'gemini-1.5-pro'        => 'gemini-1.5-pro',
+        // 'imagen-2'          => 'imagen-2',
       ],
     ];
 
