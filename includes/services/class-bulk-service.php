@@ -30,7 +30,13 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       $args = [
         'post_type'      => 'attachment',
         'post_status'    => 'inherit',
-        'post_mime_type' => 'image',
+        // Only allow common raster image types (exclude SVG, PDF, video, etc.)
+        'post_mime_type' => [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+        ],
         'posts_per_page' => $limit > 0 ? absint( $limit ) : -1,
         'fields'         => 'ids',
         'orderby'        => 'ID',
@@ -63,7 +69,13 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         [
           'post_type'              => 'attachment',
           'post_status'            => 'inherit',
-          'post_mime_type'         => 'image',
+          // Only allow common raster image types (exclude SVG, PDF, video, etc.)
+          'post_mime_type'         => [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+          ],
           'posts_per_page'         => 1,
           'fields'                 => 'ids',
           'orderby'                => 'date',
