@@ -141,7 +141,15 @@ trait PWATG_Settings_Trait {
   /** Retrieve saved settings merged with defaults. */
   public function get_settings() {
     $defaults = $this->get_default_settings();
-    $settings = wp_parse_args( get_option( PWATG::SETTINGS_KEY, [] ), $defaults );
+    if ( is_multisite() ) {
+      $main_site_id = get_main_site_id();
+      $raw_settings = function_exists('get_blog_option')
+        ? get_blog_option( $main_site_id, PWATG::SETTINGS_KEY, [] )
+        : get_option( PWATG::SETTINGS_KEY, [] );
+      $settings = wp_parse_args( $raw_settings, $defaults );
+    } else {
+      $settings = wp_parse_args( get_option( PWATG::SETTINGS_KEY, [] ), $defaults );
+    }
 
     if ( ! isset( $settings['api_keys'] ) || ! is_array( $settings['api_keys'] ) ) {
       $settings['api_keys'] = $defaults['api_keys'];
@@ -353,6 +361,14 @@ trait PWATG_Settings_Trait {
     if ( ! current_user_can( 'manage_options' ) ) {
       return;
     }
+
+    if ( is_multisite() && ! is_main_site() ) {
+      echo '<div class="notice notice-info"><p>' . esc_html__( 'Settings are inherited from the main site. Changes here will not take effect.', PWATG::TEXT_DOMAIN ) . '</p></div>';
+    }
+
+    // Optionally, you could return here to fully hide the form:
+    // if ( is_multisite() && ! is_main_site() ) return;
+
     $this->render_view( 'settings-page.php' );
   }
 

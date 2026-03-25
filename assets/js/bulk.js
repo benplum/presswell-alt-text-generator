@@ -1,4 +1,5 @@
 jQuery(function($) {
+    let isRunning = false;
   const data = window.pwatgBulkData || {};
   const nonceField = document.getElementById('pwatg_bulk_nonce');
   const ajaxAction = data.ajaxAction || 'pwatg_generate_bulk';
@@ -144,8 +145,11 @@ jQuery(function($) {
   }
 
   function finish(message) {
+    isRunning = false;
     startButton.prop('disabled', false).text(t('runBulk', 'Run Bulk Generation'));
     progressText.text(message + ' Processed: ' + processed + ', Updated: ' + updated + ', Failed: ' + failed + '.');
+    // Remove beforeunload warning when finished
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
   }
 
   function runBatch() {
@@ -153,6 +157,18 @@ jQuery(function($) {
       finish(t('bulkComplete', 'Bulk generation complete.'));
       return;
     }
+
+    isRunning = true;
+    // Add beforeunload warning
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+  function beforeUnloadHandler(e) {
+    if (isRunning) {
+      const warning = t('leaveWarning', 'Bulk generation is still running. Leaving this page will stop the process.');
+      e.preventDefault();
+      e.returnValue = warning;
+      return warning;
+    }
+  }
 
     $.post(ajaxurl, {
       action: ajaxAction,
