@@ -1,5 +1,4 @@
 jQuery(function($) {
-    let isRunning = false;
   const data = window.pwatgBulkData || {};
   const nonceField = document.getElementById('pwatg_bulk_nonce');
   const ajaxAction = data.ajaxAction || 'pwatg_generate_bulk';
@@ -18,6 +17,7 @@ jQuery(function($) {
   const refreshLink = $('#pwatg_refresh_missing');
   const refreshStatus = $('#pwatg_refresh_status');
   const refreshDefaultText = refreshLink.length ? refreshLink.text().trim() : '';
+  const pauseButton = $('#pwatg_pause_bulk');
 
   let ids = [];
   let offset = 0;
@@ -27,6 +27,10 @@ jQuery(function($) {
   let failed = 0;
   let batchSize = 5;
   let missing = 0;
+  let isRunning = false;
+  let isPaused = false;
+  let isBatchInFlight = false;
+  let hasBeforeUnloadWarning = false;
 
   function t(key, fallback) {
     return Object.prototype.hasOwnProperty.call(i18n, key) ? i18n[key] : fallback;
@@ -76,6 +80,28 @@ jQuery(function($) {
 
     if (fallbackDecrease > 0) {
       setMissingCount(Math.max(0, missing - fallbackDecrease));
+    }
+  }
+
+  function beforeUnloadHandler(e) {
+    if (isRunning) {
+      const warning = t('leaveWarning', 'Bulk generation is still running. Leaving this page will stop the process.');
+      e.preventDefault();
+      e.returnValue = warning;
+      return warning;
+    }
+  }
+
+  function toggleBeforeUnloadWarning(enabled) {
+    if (enabled && !hasBeforeUnloadWarning) {
+      window.addEventListener('beforeunload', beforeUnloadHandler);
+      hasBeforeUnloadWarning = true;
+      return;
+    }
+
+    if (!enabled && hasBeforeUnloadWarning) {
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+      hasBeforeUnloadWarning = false;
     }
   }
 
@@ -146,29 +172,26 @@ jQuery(function($) {
 
   function finish(message) {
     isRunning = false;
+    isPaused = false;
+    isBatchInFlight = false;
+    pauseButton.hide().text(t('pause', 'Pause'));
     startButton.prop('disabled', false).text(t('runBulk', 'Run Bulk Generation'));
     progressText.text(message + ' Processed: ' + processed + ', Updated: ' + updated + ', Failed: ' + failed + '.');
-    // Remove beforeunload warning when finished
-    window.removeEventListener('beforeunload', beforeUnloadHandler);
+    toggleBeforeUnloadWarning(false);
   }
 
   function runBatch() {
+    if (!isRunning || isPaused || isBatchInFlight) {
+      return;
+    }
+
     if (offset >= total) {
       finish(t('bulkComplete', 'Bulk generation complete.'));
       return;
     }
 
-    isRunning = true;
-    // Add beforeunload warning
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-  function beforeUnloadHandler(e) {
-    if (isRunning) {
-      const warning = t('leaveWarning', 'Bulk generation is still running. Leaving this page will stop the process.');
-      e.preventDefault();
-      e.returnValue = warning;
-      return warning;
-    }
-  }
+    isBatchInFlight = true;
+    let shouldContinue = false;
 
     $.post(ajaxurl, {
       action: ajaxAction,
@@ -218,14 +241,41 @@ jQuery(function($) {
         return;
       }
 
-      runBatch();
+      shouldContinue = true;
     }).fail(function(jqXHR) {
       const message = getAjaxErrorMessage(jqXHR, t('bulkFailed', 'Could not complete bulk generation.'));
       finish(message);
+    }).always(function() {
+      isBatchInFlight = false;
+      if (shouldContinue) {
+        runBatch();
+      }
     });
   }
 
+  pauseButton.on('click', function() {
+    if (!isRunning) return;
+    if (!isPaused) {
+      isPaused = true;
+      pauseButton.text(t('continue', 'Continue'));
+    } else {
+      isPaused = false;
+      pauseButton.text(t('pause', 'Pause'));
+      runBatch();
+    }
+  });
+
   startButton.on('click', function() {
+    if (isRunning) {
+      return;
+    }
+
+    isRunning = true;
+    isPaused = false;
+    isBatchInFlight = false;
+    pauseButton.show().text(t('pause', 'Pause'));
+    toggleBeforeUnloadWarning(true);
+
     startButton.prop('disabled', true).text(t('preparing', 'Preparing...'));
     progressWrap.show();
     progressBar.css('width', '0%');

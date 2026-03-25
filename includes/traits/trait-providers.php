@@ -278,9 +278,44 @@ trait PWATG_Providers_Trait {
       return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', PWATG::TEXT_DOMAIN ) );
     }
 
-    $file_size = filesize( $file_path );
-    if ( false === $file_size || $file_size > 5 * 1024 * 1024 ) {
-      return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', PWATG::TEXT_DOMAIN ) );
+    $file_size     = filesize( $file_path );
+    $max_size      = 5 * 1024 * 1024;
+    $used_fallback = false;
+
+    if ( false === $file_size ) {
+      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', PWATG::TEXT_DOMAIN ) );
+    }
+
+    // If original is too large, try generated subsizes before failing.
+    if ( $file_size > $max_size ) {
+      $sizes_to_try = [ 'large', 'medium_large', 'medium', /* 'thumbnail' */ ];
+      $base_dir     = trailingslashit( pathinfo( $file_path, PATHINFO_DIRNAME ) );
+
+      foreach ( $sizes_to_try as $size ) {
+        $intermediate = image_get_intermediate_size( $attachment_id, $size );
+        if ( ! is_array( $intermediate ) || empty( $intermediate['file'] ) ) {
+          continue;
+        }
+
+        $scaled_path = $base_dir . ltrim( (string) $intermediate['file'], '/' );
+        if ( ! file_exists( $scaled_path ) ) {
+          continue;
+        }
+
+        $scaled_size = filesize( $scaled_path );
+        if ( false === $scaled_size || $scaled_size > $max_size ) {
+          continue;
+        }
+
+        $file_path     = $scaled_path;
+        $file_size     = $scaled_size;
+        $used_fallback = true;
+        break;
+      }
+
+      if ( ! $used_fallback ) {
+        return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', PWATG::TEXT_DOMAIN ) );
+      }
     }
 
     $image_binary = file_get_contents( $file_path );
@@ -291,6 +326,13 @@ trait PWATG_Providers_Trait {
     $mime_type = get_post_mime_type( $attachment_id );
     if ( empty( $mime_type ) ) {
       $mime_type = 'image/jpeg';
+    }
+    // If we used a fallback file, infer type from the selected file path.
+    if ( $used_fallback ) {
+      $filetype = wp_check_filetype( wp_basename( $file_path ) );
+      if ( ! empty( $filetype['type'] ) ) {
+        $mime_type = $filetype['type'];
+      }
     }
 
     $prompt = sprintf(

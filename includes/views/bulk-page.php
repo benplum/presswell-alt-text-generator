@@ -60,6 +60,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
   <p>
     <button type="button" class="button button-primary" id="pwatg_start_bulk"><?php echo esc_html__( 'Run Bulk Generation', PWATG::TEXT_DOMAIN ); ?></button>
+    <button type="button" class="button pwatg-pause-bulk" id="pwatg_pause_bulk">
+      <?php echo esc_html__( 'Pause', PWATG::TEXT_DOMAIN ); ?>
+    </button>
   </p>
 
   <div id="pwatg_progress_wrap" class="pwatg-progress-wrap">

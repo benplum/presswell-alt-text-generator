@@ -117,3 +117,7 @@
 .pwatg-inline-status {
   font-weight: 600;
 }
+
+.pwatg-pause-bulk {
+  display: none;
+}
