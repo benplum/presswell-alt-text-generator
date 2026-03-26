@@ -41,6 +41,7 @@ require_once __DIR__ . '/includes/services/class-anthropic-service.php';
 require_once __DIR__ . '/includes/services/class-gemini-service.php';
 require_once __DIR__ . '/includes/services/class-provider-registry.php';
 require_once __DIR__ . '/includes/services/class-bulk-service.php';
+require_once __DIR__ . '/includes/support/cli.php';
 
 if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
   /**

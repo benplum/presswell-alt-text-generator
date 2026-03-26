@@ -42,15 +42,27 @@ A dedicated settings screen stores individual API keys per provider, default mod
 * `pwatg_available_models` — Modify the available models for each provider
 * `pwatg_provider_registry` — Map provider slugs to custom service classes
 
-**Bulk CLI Helpers**
+**WP-CLI**
 
-Bulk processing relies on `PWATG_Bulk_Service` which you can call manually:
+If WP-CLI is available, you can run single-image generation, bulk generation, and missing-alt counts from the command line:
 
 `
-$service = presswell_alt_text_generator()->get_bulk_service();
-$ids = $service->get_missing_alt_attachment_ids();
-$service->process_batch( $ids, 0, count( $ids ), false );
+wp pwatg generate <attachment-id>
+wp pwatg bulk-generate
+wp pwatg count-missing
+wp pwatg network-bulk-generate
 `
+
+Optional CLI flags:
+
+* `wp pwatg generate <attachment-id> --force`
+* `wp pwatg bulk-generate --force`
+* `wp pwatg bulk-generate --limit=<int>`
+* `wp pwatg bulk-generate --missing-only`
+* `wp pwatg network-bulk-generate --force`
+* `wp pwatg network-bulk-generate --limit=<int>`
+* `wp pwatg network-bulk-generate --missing-only`
+* `wp pwatg network-bulk-generate --sites=<id,id,...>`
 
 == Installation ==
 
@@ -73,7 +85,15 @@ Keys are stored in the site options table. They are used only when calling the s
 
 = Can I regenerate specific images without touching others? =
 
-Yes. Use the inline "Regenerate Alt Text" link in the Media Library or media modal to update a single attachment without affecting the rest of the queue.
+Yes. Use the inline "Regenerate Alt Text" link in the Media Library or media modal to update a single attachment without affecting the rest of the queue, or run `wp pwatg generate <attachment-id> --force`.
+
+= Can I run alt generation from WP-CLI? =
+
+Yes. Use `wp pwatg generate <attachment-id>` for one image, `wp pwatg bulk-generate` for a batch run, and `wp pwatg count-missing` to check remaining backlog.
+
+= Can I run bulk generation network-wide on Multisite? =
+
+Yes. Use `wp pwatg network-bulk-generate` to process all sites in the network, or pass `--sites=<id,id,...>` to target specific site IDs.
 
 = How does rate limiting work? =
 
