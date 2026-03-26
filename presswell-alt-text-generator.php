@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with Presswell Alt Text Generator. If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 if ( ! defined( 'ABSPATH' ) ) {
   exit;
@@ -48,16 +48,16 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
    * Bootstrap container for all Presswell Alt Text Generator features.
    */
   class Presswell_Alt_Text_Generator {
-	  use PWATG_Assets_Trait;
+    use PWATG_Assets_Trait;
     use PWATG_Bulk_Trait;
-	  use PWATG_Helpers_Trait;
+    use PWATG_Helpers_Trait;
     use PWATG_Media_Trait;
-	  use PWATG_Pages_Trait;
+    use PWATG_Pages_Trait;
     use PWATG_Providers_Trait;
     use PWATG_Settings_Trait;
-    
+
     const PLUGIN_FILE = __FILE__;
-	
+
     /**
      * Cached singleton instance.
      *
@@ -69,17 +69,18 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
      * Wire trait constructors and boot runtime hooks.
      */
     protected function __construct() {
-	    $this->construct_assets_trait();
+      $this->construct_assets_trait();
       $this->construct_bulk_trait();
       $this->construct_media_trait();
-	    $this->construct_pages_trait();
-	    $this->construct_settings_trait();
+
+      $this->construct_pages_trait();
+      $this->construct_settings_trait();
     }
-	
+
     /**
      * Prevent cloning the singleton.
      */
-	  public function __clone() {}
+    public function __clone() {}
 
     /**
      * Prevent unserializing the singleton.
