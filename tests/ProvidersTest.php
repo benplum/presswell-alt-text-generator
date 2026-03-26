@@ -65,10 +65,50 @@ class ProvidersTest extends WP_UnitTestCase {
     $this->assertSame( 30, $data['retry_after'] );
   }
 
+  public function test_openai_request_text_returns_connection_error_when_content_is_missing() {
+    $this->mock_http_response(
+      'https://api.openai.com/v1/chat/completions',
+      $this->build_http_response(
+        200,
+        [
+          'choices' => [
+            [
+              'message' => [],
+            ],
+          ],
+        ]
+      )
+    );
+
+    $result = PWATG_OpenAI_Service::request_text( 'sk-test', 'gpt-4.1-mini', 'Prompt' );
+    $this->assertInstanceOf( WP_Error::class, $result );
+    $this->assertSame( 'pwatg_connection_error', $result->get_error_code() );
+  }
+
   public function test_anthropic_request_text_requires_api_key() {
     $result = PWATG_Anthropic_Service::request_text( '', 'claude-3-5-haiku-latest', 'Prompt' );
     $this->assertInstanceOf( WP_Error::class, $result );
     $this->assertSame( 'pwatg_missing_api_key', $result->get_error_code() );
+  }
+
+  public function test_anthropic_request_alt_text_maps_retry_after_on_rate_limit() {
+    $this->mock_http_response(
+      'https://api.anthropic.com/v1/messages',
+      $this->build_http_response(
+        429,
+        [ 'error' => [ 'message' => 'Rate limit reached' ] ],
+        [ 'retry-after' => '12' ]
+      )
+    );
+
+    $result = PWATG_Anthropic_Service::request_alt_text( 'ak-test', 'claude-3-5-haiku-latest', 'Describe this image', 'image/png', 'binary' );
+
+    $this->assertInstanceOf( WP_Error::class, $result );
+    $this->assertSame( 'pwatg_rate_limited', $result->get_error_code() );
+
+    $data = $result->get_error_data();
+    $this->assertSame( 'anthropic', $data['provider'] );
+    $this->assertSame( 12, $data['retry_after'] );
   }
 
   public function test_gemini_request_alt_text_combines_text_parts() {

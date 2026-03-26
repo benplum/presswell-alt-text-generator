@@ -66,7 +66,7 @@ class SettingsTest extends WP_UnitTestCase {
     $sanitized = $this->plugin->sanitize_settings( $input );
 
     $this->assertSame( 'openai', $sanitized['service'], 'Invalid services should fall back to the default.' );
-    $this->assertSame( 'gpt-4.1-mini', $sanitized['model'], 'Invalid models should reset to the default option.' );
+    $this->assertSame( 'gpt-4o', $sanitized['model'], 'Invalid models should reset to the first allowed model for the resolved provider.' );
     $this->assertNotEmpty( $sanitized['prompt_seed'], 'Blank prompts should reset to the default seed.' );
     $this->assertSame( '', $sanitized['auto_generate'] );
     $this->assertSame( 'on', $sanitized['debug_logging'] );
