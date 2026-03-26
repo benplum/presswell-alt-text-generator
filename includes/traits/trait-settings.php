@@ -98,7 +98,7 @@ trait PWATG_Settings_Trait {
       'model'         => isset( $input['model'] ) ? sanitize_text_field( $input['model'] ) : $defaults['model'],
       'prompt_seed'   => isset( $input['prompt_seed'] ) ? sanitize_textarea_field( $input['prompt_seed'] ) : $defaults['prompt_seed'],
       'auto_generate' => ! empty( $input['auto_generate'] ) ? 'on' : '',
-      'debug_logging' => ! empty( $input['debug_logging'] ) ? 'on' : '',
+      'debug_logging' => ! empty( $input['debug_logging'] ) ? 'on' : 'off',
     ];
 
     $allowed_services = array_keys( $this->get_available_services() );
@@ -166,7 +166,7 @@ trait PWATG_Settings_Trait {
     }
 
     $settings['auto_generate'] = ! empty( $settings['auto_generate'] ) ? 'on' : '';
-    $settings['debug_logging'] = ! empty( $settings['debug_logging'] ) ? 'on' : '';
+    $settings['debug_logging'] = ! empty( $settings['debug_logging'] ) ? 'on' : 'off';
 
     return $settings;
   }
@@ -183,7 +183,7 @@ trait PWATG_Settings_Trait {
         'gemini'    => '',
       ],
       'auto_generate' => 'on',
-      'debug_logging' => '',
+      'debug_logging' => 'off',
     ];
   }
 
@@ -344,12 +344,12 @@ trait PWATG_Settings_Trait {
   /** Output checkbox toggle for debug logging setting. */
   public function render_debug_logging_field() {
     $settings      = $this->get_settings();
-    $debug_log_url = content_url( 'debug.log' );
+    $debug_log_url = $this->get_debug_log_url();
     ?>
     <label>
-      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[debug_logging]" value="on" <?php checked( ! empty( $settings['debug_logging'] ) ); ?> />
+      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[debug_logging]" value="on" <?php checked( isset( $settings['debug_logging'] ) ? $settings['debug_logging'] : 'off', 'on' ); ?> />
       <?php echo esc_html__( 'Log plugin activity', PWATG::TEXT_DOMAIN ); ?>
-      <?php if ( ! empty( $settings['debug_logging'] ) ) : ?>
+      <?php if ( isset( $settings['debug_logging'] ) && 'on' === $settings['debug_logging'] ) : ?>
       <a href="<?php echo esc_url( $debug_log_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'View logs', PWATG::TEXT_DOMAIN ); ?></a>
       <?php endif; ?>
     </label>

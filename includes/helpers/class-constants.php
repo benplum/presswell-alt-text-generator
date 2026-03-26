@@ -65,6 +65,8 @@ class PWATG {
   const META_KEY_ALT_TEXT = '_wp_attachment_image_alt';
   const META_KEY_LAST_GENERATED = '_pwatg_last_generated';
 
+  const DEBUG_LOG_FILENAME = 'debug-pwad.log';
+
   // Field Keys
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';
   const MEDIA_COLUMN_ALT = 'pwatg_alt_text';

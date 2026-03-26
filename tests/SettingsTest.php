@@ -28,7 +28,7 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertIsArray( $defaults['api_keys'] );
     $this->assertArrayHasKey( 'openai', $defaults['api_keys'] );
     $this->assertSame( 'on', $defaults['auto_generate'] );
-    $this->assertSame( '', $defaults['debug_logging'] );
+    $this->assertSame( 'off', $defaults['debug_logging'] );
   }
 
   public function test_get_settings_merges_saved_values_with_defaults() {

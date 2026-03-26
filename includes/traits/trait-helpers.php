@@ -85,6 +85,39 @@ trait PWATG_Helpers_Trait {
   }
 
   /**
+   * Resolve the debug log filename (filterable).
+   *
+   * @return string
+   */
+  protected function get_debug_log_filename() {
+    $filename = apply_filters( 'pwatg_debug_log_filename', PWATG::DEBUG_LOG_FILENAME );
+
+    if ( ! is_string( $filename ) || '' === trim( $filename ) ) {
+      return PWATG::DEBUG_LOG_FILENAME;
+    }
+
+    return wp_basename( trim( $filename ) );
+  }
+
+  /**
+   * Build the absolute path to the debug log file.
+   *
+   * @return string
+   */
+  protected function get_debug_log_path() {
+    return trailingslashit( WP_CONTENT_DIR ) . $this->get_debug_log_filename();
+  }
+
+  /**
+   * Build the public URL to the debug log file.
+   *
+   * @return string
+   */
+  protected function get_debug_log_url() {
+    return content_url( $this->get_debug_log_filename() );
+  }
+
+  /**
    * Determine whether debug logging is enabled in plugin settings.
    *
    * @return bool
@@ -96,7 +129,7 @@ trait PWATG_Helpers_Trait {
 
     $settings = $this->get_settings();
 
-    return ! empty( $settings['debug_logging'] );
+    return isset( $settings['debug_logging'] ) && 'on' === $settings['debug_logging'];
   }
 
   /**
@@ -110,12 +143,17 @@ trait PWATG_Helpers_Trait {
       return;
     }
 
-    $line = '[PWATG] ' . sanitize_text_field( (string) $message );
+    $log_path = $this->get_debug_log_path();
+    $timestamp = gmdate( 'Y-m-d H:i:s' );
+    $line = sprintf( '[%s UTC] [PWATG] %s', $timestamp, sanitize_text_field( (string) $message ) );
     if ( ! empty( $context ) ) {
-      $line .= ' ' . wp_json_encode( $this->sanitize_debug_log_value( $context ) );
+      $encoded_context = wp_json_encode( $this->sanitize_debug_log_value( $context ) );
+      if ( false !== $encoded_context ) {
+        $line .= ' ' . $encoded_context;
+      }
     }
 
-    error_log( $line );
+    error_log( $line . PHP_EOL, 3, $log_path );
   }
 
   /**
