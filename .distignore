@@ -5,9 +5,11 @@
 .gitlab-ci.yml
 .travis.yml
 .DS_Store
+**/.DS_Store
+.phpunit.result.cache
 Thumbs.db
 behat.yml
-bin
+bin/
 circle.yml
 composer.json
 composer.lock
@@ -22,9 +24,9 @@ multisite.xml.dist
 phpcs.ruleset.xml
 README.md
 wp-cli.local.yml
-tests
-vendor
-node_modules
+tests/
+vendor/
+node_modules/
 *.sql
 *.tar.gz
 *.zip
