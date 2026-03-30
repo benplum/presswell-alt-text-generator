@@ -30,10 +30,6 @@ Inline actions let you generate or regenerate alt text directly from each image 
 
 The Bulk page counts images missing alt text, allows regeneration preferences, and runs batches while surfacing progress, failures, and rate-limit pauses.
 
-***Prompt and Provider Controls***
-
-A dedicated settings screen stores provider API keys, default model selection, and the prompt seed prepended to each request. You can test provider connectivity without leaving wp-admin.
-
 = Documentation =
 
 **Filters**
@@ -46,10 +42,10 @@ A dedicated settings screen stores provider API keys, default model selection, a
 
 If WP-CLI is available, you can run single-image generation, bulk generation, and missing-alt counts from the command line:
 
-	wp pwatg generate <attachment-id>
-	wp pwatg bulk-generate
-	wp pwatg count-missing
-	wp pwatg network-bulk-generate
+* `wp pwatg generate <attachment-id>`
+* `wp pwatg bulk-generate`
+* `wp pwatg count-missing`
+* `wp pwatg network-bulk-generate`
 
 Optional CLI flags:
 
@@ -104,8 +100,9 @@ This plugin sends image-derived payloads to the AI provider you choose when gene
 == Screenshots ==
 
 1. Settings screen with provider, model, prompt, and API key controls.
-2. Media Library column with inline Generate/Regenerate actions.
-3. Bulk generator queue with progress and retry status.
+2. Bulk generator queue with progress and retry status.
+3. Alt text generation controls on media edit screen.
+3. Alt text generation controls in media modal.
 
 == Changelog ==
 

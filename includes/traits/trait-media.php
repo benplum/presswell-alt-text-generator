@@ -458,7 +458,7 @@ trait PWATG_Media_Trait {
 
     $message = sprintf(
       /* translators: 1: processed count, 2: updated count, 3: failed count */
-      esc_html__( 'Bulk generation complete. Processed: %1$d, Updated: %2$d, Failed: %3$d.', PWATG::TEXT_DOMAIN ),
+      esc_html__( 'Bulk generation complete. Processed: %1$d &middot; Updated: %2$d &middot; Failed: %3$d', PWATG::TEXT_DOMAIN ),
       intval( $notice['processed'] ),
       intval( $notice['updated'] ),
       intval( $notice['failed'] )

@@ -176,7 +176,7 @@ jQuery(function($) {
     isBatchInFlight = false;
     pauseButton.hide().text(t('pause', 'Pause'));
     startButton.prop('disabled', false).text(t('runBulk', 'Run Bulk Generation'));
-    progressText.text(message + ' Processed: ' + processed + ', Updated: ' + updated + ', Failed: ' + failed + '.');
+    progressText.text(message + ' Processed: ' + processed + ' · Updated: ' + updated + ' · Failed: ' + failed);
     toggleBeforeUnloadWarning(false);
   }
 
