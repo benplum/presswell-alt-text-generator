@@ -46,6 +46,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       $should_filter_missing = $force_missing_only || ! $regenerate_existing;
 
       if ( $should_filter_missing ) {
+        // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required to select attachments missing alt text metadata.
         $args['meta_query'] = [
           'relation' => 'OR',
           [
@@ -83,6 +84,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
           'no_found_rows'          => false,
           'update_post_term_cache' => false,
           'update_post_meta_cache' => false,
+          // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required to count attachments missing alt text metadata.
           'meta_query'             => [
             'relation' => 'OR',
             [

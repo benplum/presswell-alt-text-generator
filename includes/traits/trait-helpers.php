@@ -153,6 +153,7 @@ trait PWATG_Helpers_Trait {
       }
     }
 
+    // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Writing to plugin-managed log file path when debug logging is explicitly enabled.
     error_log( $line . PHP_EOL, 3, $log_path );
   }
 

@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 <div class="wrap">
   <?php wp_nonce_field( PWATG::NONCE_GENERATE_BULK, 'pwatg_bulk_nonce', false ); ?>
   <?php
+  // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Local template variable from extracted view context.
   $rate_limit_message = isset( $rate_limit_message ) ? (string) $rate_limit_message : '';
   if ( '' !== $rate_limit_message ) :
     ?>
@@ -27,6 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
   </p>
   
   <?php
+    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Local template variable from extracted view context.
     $missing_alt_count = isset( $missing_alt_count ) ? absint( $missing_alt_count ) : 0;
   ?>
   <div class="pwatg-count">

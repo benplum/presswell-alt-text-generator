@@ -99,7 +99,7 @@ trait PWATG_Bulk_Trait {
       );
     }
 
-    $raw_ids             = isset( $_POST['ids'] ) ? (array) wp_unslash( $_POST['ids'] ) : [];
+    $raw_ids             = isset( $_POST['ids'] ) ? array_values( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['ids'] ) ) ) ) : [];
     $offset              = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
     $batch_size          = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
     $run_test            = ! empty( $_POST['run_test'] );

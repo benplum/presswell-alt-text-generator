@@ -109,6 +109,7 @@ if ( ! function_exists( 'presswell_alt_text_generator' ) ) {
    *
    * @return Presswell_Alt_Text_Generator
    */
+  // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound -- Public plugin helper function intentionally mirrors plugin slug.
   function presswell_alt_text_generator() {
     return Presswell_Alt_Text_Generator::instance();
   }

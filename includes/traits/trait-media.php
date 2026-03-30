@@ -388,15 +388,22 @@ trait PWATG_Media_Trait {
 
   /** Output various contextual admin notices relevant to the plugin. */
   public function render_admin_notices() {
+    $page_param = filter_input( INPUT_GET, 'page', FILTER_UNSAFE_RAW );
+    $page       = is_string( $page_param ) ? sanitize_key( wp_unslash( $page_param ) ) : '';
+
+    $single_param = filter_input( INPUT_GET, 'pwatg_single', FILTER_UNSAFE_RAW );
+    $status       = is_string( $single_param ) ? sanitize_key( wp_unslash( $single_param ) ) : '';
+
+    $attachment_param = filter_input( INPUT_GET, 'pwatg_attachment', FILTER_UNSAFE_RAW );
+    $attachment       = is_string( $attachment_param ) ? absint( wp_unslash( $attachment_param ) ) : 0;
+
     if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
       if ( ! current_user_can( 'upload_files' ) ) {
         return;
       }
     }
 
-    if ( isset( $_GET['pwatg_single'] ) ) {
-      $status     = sanitize_key( wp_unslash( $_GET['pwatg_single'] ) );
-      $attachment = isset( $_GET['pwatg_attachment'] ) ? absint( $_GET['pwatg_attachment'] ) : 0;
+    if ( '' !== $status ) {
 
       $messages = [
         'updated'     => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
@@ -416,32 +423,32 @@ trait PWATG_Media_Trait {
             $attachment
           );
         }
-        echo $this->render_view_to_string(
+        echo wp_kses_post( $this->render_view_to_string(
           'admin-notice.php',
           [
             'class' => $class,
             'text'  => $text,
           ]
-        );
+        ) );
       }
     }
 
-    if ( ! empty( $_GET['page'] ) && PWATG::SETTINGS_PAGE_SLUG === $_GET['page'] ) {
+    if ( '' !== $page && PWATG::SETTINGS_PAGE_SLUG === $page ) {
       $test_notice = get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
       if ( is_array( $test_notice ) && isset( $test_notice['message'] ) ) {
         delete_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
         $class = ( isset( $test_notice['type'] ) && 'success' === $test_notice['type'] ) ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
-        echo $this->render_view_to_string(
+        echo wp_kses_post( $this->render_view_to_string(
           'admin-notice.php',
           [
             'class' => $class,
             'text'  => $test_notice['message'],
           ]
-        );
+        ) );
       }
     }
 
-    if ( empty( $_GET['page'] ) || PWATG::BULK_PAGE_SLUG !== $_GET['page'] ) {
+    if ( '' === $page || PWATG::BULK_PAGE_SLUG !== $page ) {
       return;
     }
 
@@ -459,12 +466,12 @@ trait PWATG_Media_Trait {
       intval( $notice['updated'] ),
       intval( $notice['failed'] )
     );
-    echo $this->render_view_to_string(
+    echo wp_kses_post( $this->render_view_to_string(
       'admin-notice.php',
       [
         'class' => 'notice notice-info is-dismissible',
         'text'  => $message,
       ]
-    );
+    ) );
   }
 }

@@ -111,7 +111,8 @@ trait PWATG_Assets_Trait {
     }
 
     if ( current_user_can( 'upload_files' ) ) {
-      $current_post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
+      $current_post_param = filter_input( INPUT_GET, 'post', FILTER_UNSAFE_RAW );
+      $current_post_id    = is_scalar( $current_post_param ) ? absint( (string) $current_post_param ) : 0;
       $inline_url      = '';
       $inline_last     = '';
       $inline_has_alt  = false;
@@ -164,7 +165,8 @@ trait PWATG_Assets_Trait {
    * @return bool
    */
   private function is_settings_page( $hook_suffix ) {
-    $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+    $page_param = filter_input( INPUT_GET, 'page', FILTER_UNSAFE_RAW );
+    $page       = is_string( $page_param ) ? sanitize_key( wp_unslash( $page_param ) ) : '';
 
     return PWATG::SETTINGS_PAGE_SCREEN_ID === $hook_suffix && PWATG::SETTINGS_PAGE_SLUG === $page;
   }
@@ -177,7 +179,8 @@ trait PWATG_Assets_Trait {
    * @return bool
    */
   private function is_bulk_page( $hook_suffix ) {
-    $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+    $page_param = filter_input( INPUT_GET, 'page', FILTER_UNSAFE_RAW );
+    $page       = is_string( $page_param ) ? sanitize_key( wp_unslash( $page_param ) ) : '';
 
     return PWATG::BULK_PAGE_SCREEN_ID === $hook_suffix && PWATG::BULK_PAGE_SLUG === $page;
   }
