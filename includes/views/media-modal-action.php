@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 </a>
 <p class="pwatg-last-generated">
 	<strong>
-		<?php echo esc_html__( 'Last generated:', PWATG::TEXT_DOMAIN ); ?>
+		<?php echo esc_html__( 'Last generated:', 'presswell-alt-text-generator' ); ?>
 	</strong> 
 	<?php echo esc_html( $last_generated ); ?>
 </p>

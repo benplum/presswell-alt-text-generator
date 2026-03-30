@@ -13,7 +13,7 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
     public static function request_alt_text( $service, $api_key, $model, $prompt, $mime_type, $image_binary ) {
       $provider = self::resolve( $service );
       if ( ! is_callable( [ $provider, 'request_alt_text' ] ) ) {
-        return new WP_Error( 'pwatg_invalid_provider', __( 'Selected AI provider is not supported.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_invalid_provider', __( 'Selected AI provider is not supported.', 'presswell-alt-text-generator' ) );
       }
 
       return call_user_func( [ $provider, 'request_alt_text' ], $api_key, $model, $prompt, $mime_type, $image_binary );
@@ -23,7 +23,7 @@ if ( ! class_exists( 'PWATG_Provider_Registry' ) ) {
     public static function request_text( $service, $api_key, $model, $prompt ) {
       $provider = self::resolve( $service );
       if ( ! is_callable( [ $provider, 'request_text' ] ) ) {
-        return new WP_Error( 'pwatg_invalid_provider', __( 'Selected AI provider is not supported.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_invalid_provider', __( 'Selected AI provider is not supported.', 'presswell-alt-text-generator' ) );
       }
 
       return call_user_func( [ $provider, 'request_text' ], $api_key, $model, $prompt );

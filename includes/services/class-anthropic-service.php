@@ -12,7 +12,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
     /** Request alt text using Anthropic's multimodal endpoint. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
-        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
       }
 
       $body = [
@@ -62,13 +62,13 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
         return $data;
       }
 
-      return self::extract_text_block( $data, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text' ) );
+      return self::extract_text_block( $data, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ) );
     }
 
     /** Request a quick text response to validate credentials/config. */
     public static function request_text( $api_key, $model, $prompt ) {
       if ( '' === trim( (string) $api_key ) ) {
-        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
       }
 
       $body = [
@@ -104,7 +104,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
         return $data;
       }
 
-      return self::extract_text_block( $data, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text' ) );
+      return self::extract_text_block( $data, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text-generator' ) );
     }
 
     /** Decode JSON body and convert non-2xx responses to WP_Error. */
@@ -113,7 +113,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
       $data      = json_decode( wp_remote_retrieve_body( $response ), true );
 
       if ( $http_code < 200 || $http_code >= 300 ) {
-        $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text' );
+        $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text-generator' );
         return self::build_api_error( $http_code, $error_message, $response );
       }
 

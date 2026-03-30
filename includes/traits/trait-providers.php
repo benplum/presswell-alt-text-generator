@@ -58,7 +58,7 @@ trait PWATG_Providers_Trait {
   protected function format_rate_limit_lock_message( array $lock, $remaining ) {
     $base_message = isset( $lock['message'] ) && '' !== trim( (string) $lock['message'] )
       ? trim( (string) $lock['message'] )
-      : __( 'AI provider temporarily paused requests.', PWATG::TEXT_DOMAIN );
+      : __( 'AI provider temporarily paused requests.', 'presswell-alt-text-generator' );
 
     if ( $remaining <= 0 ) {
       return $base_message;
@@ -68,7 +68,7 @@ trait PWATG_Providers_Trait {
 
     return sprintf(
       /* translators: 1: base error message. 2: human-readable duration. */
-      __( '%1$s Please wait %2$s before retrying.', PWATG::TEXT_DOMAIN ),
+      __( '%1$s Please wait %2$s before retrying.', 'presswell-alt-text-generator' ),
       $base_message,
       $human
     );
@@ -153,8 +153,8 @@ trait PWATG_Providers_Trait {
 
     if ( '' === $message ) {
       $message = 'pwatg_quota_exceeded' === $error->get_error_code()
-        ? __( 'Quota exceeded for the AI provider.', PWATG::TEXT_DOMAIN )
-        : __( 'Rate limit reached for the AI provider.', PWATG::TEXT_DOMAIN );
+        ? __( 'Quota exceeded for the AI provider.', 'presswell-alt-text-generator' )
+        : __( 'Rate limit reached for the AI provider.', 'presswell-alt-text-generator' );
     }
 
     if ( '' !== $label && false === stripos( $message, $label ) ) {
@@ -247,7 +247,7 @@ trait PWATG_Providers_Trait {
     );
 
     if ( ! $attachment_id || ! wp_attachment_is_image( $attachment_id ) ) {
-      $error = new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', 'presswell-alt-text-generator' ) );
       $this->debug_log( 'Alt generation failed: invalid attachment.', [ 'attachment_id' => $attachment_id ] );
       return $error;
     }
@@ -275,7 +275,7 @@ trait PWATG_Providers_Trait {
 
     $file_path = get_attached_file( $attachment_id );
     if ( ! $file_path || ! file_exists( $file_path ) ) {
-      return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', PWATG::TEXT_DOMAIN ) );
+      return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', 'presswell-alt-text-generator' ) );
     }
 
     $file_size     = filesize( $file_path );
@@ -283,7 +283,7 @@ trait PWATG_Providers_Trait {
     $used_fallback = false;
 
     if ( false === $file_size ) {
-      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', PWATG::TEXT_DOMAIN ) );
+      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
     }
 
     // If original is too large, try generated subsizes before failing.
@@ -314,13 +314,13 @@ trait PWATG_Providers_Trait {
       }
 
       if ( ! $used_fallback ) {
-        return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', PWATG::TEXT_DOMAIN ) );
+        return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', 'presswell-alt-text-generator' ) );
       }
     }
 
     $image_binary = file_get_contents( $file_path );
     if ( false === $image_binary ) {
-      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', PWATG::TEXT_DOMAIN ) );
+      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
     }
 
     $mime_type = get_post_mime_type( $attachment_id );
@@ -337,7 +337,7 @@ trait PWATG_Providers_Trait {
 
     $prompt = sprintf(
       /* translators: %s: filename */
-      __( 'Filename context: %s. Return only the alt text with no quotes.', PWATG::TEXT_DOMAIN ),
+      __( 'Filename context: %s. Return only the alt text with no quotes.', 'presswell-alt-text-generator' ),
       basename( $file_path )
     );
 
@@ -361,7 +361,7 @@ trait PWATG_Providers_Trait {
     );
 
     if ( '' === $model ) {
-      $error = new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
       $this->debug_log( 'Alt generation failed: missing model.', [ 'attachment_id' => $attachment_id ] );
       return $error;
     }
@@ -376,7 +376,7 @@ trait PWATG_Providers_Trait {
     }
 
     if ( '' === $api_key ) {
-      $error = new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', 'presswell-alt-text-generator' ) );
       $this->debug_log( 'Alt generation failed: missing API key.', [ 'attachment_id' => $attachment_id, 'service' => $service ] );
       return $error;
     }
@@ -400,7 +400,7 @@ trait PWATG_Providers_Trait {
 
     $alt_text = sanitize_text_field( $alt_text );
     if ( '' === $alt_text ) {
-      $error = new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', PWATG::TEXT_DOMAIN ) );
+      $error = new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ) );
       $this->debug_log( 'Provider returned empty alt text.', [ 'attachment_id' => $attachment_id, 'service' => $service, 'model' => $model ] );
       return $error;
     }

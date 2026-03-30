@@ -69,7 +69,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $filtered = $this->plugin->add_media_alt_column( $columns );
 
     $this->assertArrayHasKey( PWATG::MEDIA_COLUMN_ALT, $filtered );
-    $this->assertSame( __( 'Alt Text', PWATG::TEXT_DOMAIN ), $filtered[ PWATG::MEDIA_COLUMN_ALT ] );
+    $this->assertSame( __( 'Alt Text', 'presswell-alt-text-generator' ), $filtered[ PWATG::MEDIA_COLUMN_ALT ] );
   }
 
   public function test_media_alt_column_renders_alt_text_preview() {

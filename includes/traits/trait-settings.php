@@ -28,14 +28,14 @@ trait PWATG_Settings_Trait {
 
     add_settings_section(
       'pwatg_main_section',
-      __( 'Settings', PWATG::TEXT_DOMAIN ),
+      __( 'Settings', 'presswell-alt-text-generator' ),
       '__return_false',
       PWATG::SETTINGS_PAGE_SLUG
     );
 
     add_settings_field(
       'service',
-      __( 'AI Service', PWATG::TEXT_DOMAIN ),
+      __( 'AI Service', 'presswell-alt-text-generator' ),
       [ $this, 'render_service_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -43,7 +43,7 @@ trait PWATG_Settings_Trait {
 
     add_settings_field(
       'api_key',
-      __( 'API Key', PWATG::TEXT_DOMAIN ),
+      __( 'API Key', 'presswell-alt-text-generator' ),
       [ $this, 'render_api_key_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -51,7 +51,7 @@ trait PWATG_Settings_Trait {
 
     add_settings_field(
       'model',
-      __( 'Model', PWATG::TEXT_DOMAIN ),
+      __( 'Model', 'presswell-alt-text-generator' ),
       [ $this, 'render_model_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -59,7 +59,7 @@ trait PWATG_Settings_Trait {
 
     add_settings_field(
       'prompt_seed',
-      __( 'Prompt', PWATG::TEXT_DOMAIN ),
+      __( 'Prompt', 'presswell-alt-text-generator' ),
       [ $this, 'render_prompt_seed_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -67,7 +67,7 @@ trait PWATG_Settings_Trait {
 
     add_settings_field(
       'auto_generate',
-      __( 'Generate on Upload', PWATG::TEXT_DOMAIN ),
+      __( 'Generate on Upload', 'presswell-alt-text-generator' ),
       [ $this, 'render_auto_generate_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -75,7 +75,7 @@ trait PWATG_Settings_Trait {
 
     add_settings_field(
       'debug_logging',
-      __( 'Debug Logging', PWATG::TEXT_DOMAIN ),
+      __( 'Debug Logging', 'presswell-alt-text-generator' ),
       [ $this, 'render_debug_logging_field' ],
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
@@ -190,9 +190,9 @@ trait PWATG_Settings_Trait {
   /** List human-friendly provider labels keyed by slug. */
   public function get_available_services() {
     $labels = [
-      'openai'    => __( 'OpenAI', PWATG::TEXT_DOMAIN ),
-      'anthropic' => __( 'Anthropic', PWATG::TEXT_DOMAIN ),
-      'gemini'    => __( 'Google Gemini', PWATG::TEXT_DOMAIN ),
+      'openai'    => __( 'OpenAI', 'presswell-alt-text-generator' ),
+      'anthropic' => __( 'Anthropic', 'presswell-alt-text-generator' ),
+      'gemini'    => __( 'Google Gemini', 'presswell-alt-text-generator' ),
     ];
 
     $services = [];
@@ -294,7 +294,7 @@ trait PWATG_Settings_Trait {
           echo esc_html(
             sprintf(
               /* translators: %s: AI service name */
-                __( 'API key for %s.', PWATG::TEXT_DOMAIN ),
+                __( 'API key for %s.', 'presswell-alt-text-generator' ),
               $label
             )
           );
@@ -326,7 +326,7 @@ trait PWATG_Settings_Trait {
     $settings = $this->get_settings();
     ?>
     <textarea name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[prompt_seed]" rows="4" cols="50" class="large-text"><?php echo esc_textarea( $settings['prompt_seed'] ); ?></textarea>
-    <p class="description"><?php echo esc_html__( 'Base instruction prepended to each request. Keep it concise and accessibility-focused.', PWATG::TEXT_DOMAIN ); ?></p>
+    <p class="description"><?php echo esc_html__( 'Base instruction prepended to each request. Keep it concise and accessibility-focused.', 'presswell-alt-text-generator' ); ?></p>
     <?php
   }
 
@@ -336,7 +336,7 @@ trait PWATG_Settings_Trait {
     ?>
     <label>
       <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[auto_generate]" value="on" <?php checked( ! empty( $settings['auto_generate'] ) ); ?> />
-      <?php echo esc_html__( 'Generate alt text automatically when an image is uploaded.', PWATG::TEXT_DOMAIN ); ?>
+      <?php echo esc_html__( 'Generate alt text automatically when an image is uploaded.', 'presswell-alt-text-generator' ); ?>
     </label>
     <?php
   }
@@ -348,9 +348,9 @@ trait PWATG_Settings_Trait {
     ?>
     <label>
       <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[debug_logging]" value="on" <?php checked( isset( $settings['debug_logging'] ) ? $settings['debug_logging'] : 'off', 'on' ); ?> />
-      <?php echo esc_html__( 'Log plugin activity', PWATG::TEXT_DOMAIN ); ?>
+      <?php echo esc_html__( 'Log plugin activity', 'presswell-alt-text-generator' ); ?>
       <?php if ( isset( $settings['debug_logging'] ) && 'on' === $settings['debug_logging'] ) : ?>
-      <a href="<?php echo esc_url( $debug_log_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'View logs', PWATG::TEXT_DOMAIN ); ?></a>
+      <a href="<?php echo esc_url( $debug_log_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'View logs', 'presswell-alt-text-generator' ); ?></a>
       <?php endif; ?>
     </label>
     <?php
@@ -363,7 +363,7 @@ trait PWATG_Settings_Trait {
     }
 
     if ( is_multisite() && ! is_main_site() ) {
-      echo '<div class="notice notice-info"><p>' . esc_html__( 'Settings are inherited from the main site. Changes here will not take effect.', PWATG::TEXT_DOMAIN ) . '</p></div>';
+      echo '<div class="notice notice-info"><p>' . esc_html__( 'Settings are inherited from the main site. Changes here will not take effect.', 'presswell-alt-text-generator' ) . '</p></div>';
     }
 
     // Optionally, you could return here to fully hide the form:
@@ -375,7 +375,7 @@ trait PWATG_Settings_Trait {
   /** Process the "Test Connection" helper form. */
   public function handle_test_provider() {
     if ( ! current_user_can( 'manage_options' ) ) {
-      wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
+      wp_die( esc_html__( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) );
     }
 
     check_admin_referer( PWATG::AJAX_TEST_PROVIDER, 'pwatg_test_provider_nonce' );
@@ -399,7 +399,7 @@ trait PWATG_Settings_Trait {
         PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
         [
           'type'    => 'error',
-          'message' => __( 'Service, model, and API key are required to test the connection.', PWATG::TEXT_DOMAIN ),
+          'message' => __( 'Service, model, and API key are required to test the connection.', 'presswell-alt-text-generator' ),
         ],
         PWATG::TRANSIENT_NOTICE_TTL
       );
@@ -426,7 +426,7 @@ trait PWATG_Settings_Trait {
           'type'    => 'error',
           'message' => sprintf(
             /* translators: %s: provider error message */
-            __( 'Connection failed: %s', PWATG::TEXT_DOMAIN ),
+            __( 'Connection failed: %s', 'presswell-alt-text-generator' ),
             $result->get_error_message()
           ),
         ],
@@ -439,11 +439,11 @@ trait PWATG_Settings_Trait {
         $response_text = mb_substr( $response_text, 0, 120 ) . '...';
       }
 
-      $message = __( 'Connection successful.', PWATG::TEXT_DOMAIN );
+      $message = __( 'Connection successful.', 'presswell-alt-text-generator' );
       if ( '' !== $response_text ) {
         $message = sprintf(
           /* translators: %s: provider response text */
-          __( 'Connection successful. Response: %s', PWATG::TEXT_DOMAIN ),
+          __( 'Connection successful. Response: %s', 'presswell-alt-text-generator' ),
           $response_text
         );
       }

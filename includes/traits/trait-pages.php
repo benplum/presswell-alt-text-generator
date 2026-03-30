@@ -19,16 +19,16 @@ trait PWATG_Pages_Trait {
   /** Add the settings and bulk pages. */
   public function register_admin_pages() {
     add_options_page(
-      __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),
-      __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),
+      __( 'Alt Text Generator', 'presswell-alt-text-generator' ),
+      __( 'Alt Text Generator', 'presswell-alt-text-generator' ),
       'manage_options',
       PWATG::SETTINGS_PAGE_SLUG,
       [ $this, 'render_settings_page' ]
     );
 
     add_media_page(
-      __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),
-      __( 'Alt Text Generator', PWATG::TEXT_DOMAIN ),
+      __( 'Alt Text Generator', 'presswell-alt-text-generator' ),
+      __( 'Alt Text Generator', 'presswell-alt-text-generator' ),
       'manage_options',
       PWATG::BULK_PAGE_SLUG,
       [ $this, 'render_bulk_page' ]
@@ -42,7 +42,7 @@ trait PWATG_Pages_Trait {
     $settings_link = sprintf(
       '<a href="%s">%s</a>',
       esc_url( admin_url( PWATG::SETTINGS_PAGE_URL ) ),
-      esc_html__( 'Settings', PWATG::TEXT_DOMAIN )
+      esc_html__( 'Settings', 'presswell-alt-text-generator' )
     );
 
     array_unshift( $links, $settings_link );

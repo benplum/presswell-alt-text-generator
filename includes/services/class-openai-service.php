@@ -12,7 +12,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
     /** Request alt text describing the supplied image. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
-        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
       }
 
       $body = [
@@ -66,13 +66,13 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
         return trim( wp_strip_all_tags( (string) $data['choices'][0]['message']['content'] ) );
       }
 
-      return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text' ) );
+      return new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ) );
     }
 
     /** Request a short text-only completion (used for testing credentials). */
     public static function request_text( $api_key, $model, $prompt ) {
       if ( '' === trim( (string) $api_key ) ) {
-        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text' ) );
+        return new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
       }
 
       $body = [
@@ -111,7 +111,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
         return trim( wp_strip_all_tags( (string) $data['choices'][0]['message']['content'] ) );
       }
 
-      return new WP_Error( 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text' ) );
+      return new WP_Error( 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text-generator' ) );
     }
 
     /** Parse the JSON body and convert non-200 responses into WP_Error. */
@@ -120,7 +120,7 @@ if ( ! class_exists( 'PWATG_OpenAI_Service' ) ) {
       $data      = json_decode( wp_remote_retrieve_body( $response ), true );
 
       if ( $http_code < 200 || $http_code >= 300 ) {
-        $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text' );
+        $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text-generator' );
         return self::build_api_error( $http_code, $error_message, $response );
       }
 

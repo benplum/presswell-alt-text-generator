@@ -42,7 +42,7 @@ trait PWATG_Bulk_Trait {
   /** AJAX: build the attachment list for a bulk run. */
   public function handle_bulk_init_ajax() {
     if ( ! current_user_can( 'manage_options' ) ) {
-      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
+      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) ], 403 );
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
@@ -83,7 +83,7 @@ trait PWATG_Bulk_Trait {
   /** AJAX: process a queued batch of attachment IDs. */
   public function handle_bulk_generate_ajax() {
     if ( ! current_user_can( 'manage_options' ) ) {
-      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
+      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) ], 403 );
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
@@ -143,7 +143,7 @@ trait PWATG_Bulk_Trait {
   /** AJAX: scan for attachments that are missing alt text. */
   public function handle_bulk_scan_missing_ajax() {
     if ( ! current_user_can( 'manage_options' ) ) {
-      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) ], 403 );
+      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) ], 403 );
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
@@ -174,7 +174,7 @@ trait PWATG_Bulk_Trait {
   /** Handle the non-AJAX bulk form submission fallback. */
   public function handle_bulk_generation() {
     if ( ! current_user_can( 'manage_options' ) ) {
-      wp_die( esc_html__( 'You do not have permission to do that.', PWATG::TEXT_DOMAIN ) );
+      wp_die( esc_html__( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) );
     }
 
     check_admin_referer( PWATG::AJAX_GENERATE_BULK );
