@@ -8,6 +8,23 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Handles registering and localizing all admin-side assets.
  */
 trait PWATG_Assets_Trait {
+  /**
+   * Retrieve a query parameter in a way that works in both web and CLI contexts.
+   *
+   * @param string $key Query string key.
+   *
+   * @return string
+   */
+  private function get_query_param( $key ) {
+    $value = filter_input( INPUT_GET, $key, FILTER_UNSAFE_RAW );
+
+    if ( null === $value || false === $value ) {
+      $value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : '';
+    }
+
+    return is_scalar( $value ) ? (string) $value : '';
+  }
+
   /** Hook asset loaders into WordPress. */
   protected function construct_assets_trait() {
     add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
@@ -165,8 +182,7 @@ trait PWATG_Assets_Trait {
    * @return bool
    */
   private function is_settings_page( $hook_suffix ) {
-    $page_param = filter_input( INPUT_GET, 'page', FILTER_UNSAFE_RAW );
-    $page       = is_string( $page_param ) ? sanitize_key( wp_unslash( $page_param ) ) : '';
+    $page = sanitize_key( $this->get_query_param( 'page' ) );
 
     return PWATG::SETTINGS_PAGE_SCREEN_ID === $hook_suffix && PWATG::SETTINGS_PAGE_SLUG === $page;
   }
@@ -179,8 +195,7 @@ trait PWATG_Assets_Trait {
    * @return bool
    */
   private function is_bulk_page( $hook_suffix ) {
-    $page_param = filter_input( INPUT_GET, 'page', FILTER_UNSAFE_RAW );
-    $page       = is_string( $page_param ) ? sanitize_key( wp_unslash( $page_param ) ) : '';
+    $page = sanitize_key( $this->get_query_param( 'page' ) );
 
     return PWATG::BULK_PAGE_SCREEN_ID === $hook_suffix && PWATG::BULK_PAGE_SLUG === $page;
   }
