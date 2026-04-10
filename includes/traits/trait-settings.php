@@ -366,9 +366,6 @@ trait PWATG_Settings_Trait {
       echo '<div class="notice notice-info"><p>' . esc_html__( 'Settings are inherited from the main site. Changes here will not take effect.', 'presswell-alt-text-generator' ) . '</p></div>';
     }
 
-    // Optionally, you could return here to fully hide the form:
-    // if ( is_multisite() && ! is_main_site() ) return;
-
     $this->render_view( 'settings-page.php' );
   }
 
