@@ -4,8 +4,8 @@ Tags: accessibility, alt text, media library, ai, image seo
 Requires at least: 6.1
 Tested up to: 6.9
 Stable tag: 1.0.0
-License: GNU General Public License v2.0 or later
-License URI: http://www.gnu.org/licenses/gpl-2.0.html
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Generate accessible image alt text in WordPress with OpenAI, Anthropic, and Google Gemini.
 
@@ -60,7 +60,9 @@ Optional CLI flags:
 
 == Installation ==
 
-Install via the WordPress plugin installer or manually upload the folder to `wp-content/plugins/`.
+Install via the WordPress plugin installer, or manually upload the plugin directory to `wp-content/plugins/`.
+
+**Configuration**
 
 1. Activate the plugin.
 2. Visit *Settings -> Alt Text Generator* to enter your API key and choose a model.
@@ -102,7 +104,7 @@ This plugin sends image-derived payloads to the AI provider you choose when gene
 1. Settings screen with provider, model, prompt, and API key controls.
 2. Bulk generator queue with progress and retry status.
 3. Alt text generation controls on media edit screen.
-3. Alt text generation controls in media modal.
+4. Alt text generation controls in media modal.
 
 == Changelog ==
 
