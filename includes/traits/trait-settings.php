@@ -127,12 +127,16 @@ trait PWATG_Settings_Trait {
     $raw_api_keys          = isset( $input['api_keys'] ) && is_array( $input['api_keys'] ) ? $input['api_keys'] : [];
     foreach ( array_keys( $defaults['api_keys'] ) as $service_key ) {
       if ( isset( $raw_api_keys[ $service_key ] ) ) {
-        $sanitized['api_keys'][ $service_key ] = sanitize_text_field( $raw_api_keys[ $service_key ] );
+        $sanitized['api_keys'][ $service_key ] = is_scalar( $raw_api_keys[ $service_key ] )
+          ? trim( (string) wp_unslash( $raw_api_keys[ $service_key ] ) )
+          : '';
       }
     }
 
     if ( isset( $input['api_key'] ) && '' !== trim( (string) $input['api_key'] ) && '' === $sanitized['api_keys']['openai'] ) {
-      $sanitized['api_keys']['openai'] = sanitize_text_field( $input['api_key'] );
+      $sanitized['api_keys']['openai'] = is_scalar( $input['api_key'] )
+        ? trim( (string) wp_unslash( $input['api_key'] ) )
+        : '';
     }
 
     return $sanitized;
@@ -162,7 +166,9 @@ trait PWATG_Settings_Trait {
     }
 
     if ( isset( $settings['api_key'] ) && '' !== trim( (string) $settings['api_key'] ) && '' === $settings['api_keys']['openai'] ) {
-      $settings['api_keys']['openai'] = sanitize_text_field( $settings['api_key'] );
+      $settings['api_keys']['openai'] = is_scalar( $settings['api_key'] )
+        ? trim( (string) $settings['api_key'] )
+        : '';
     }
 
     $settings['auto_generate'] = ! empty( $settings['auto_generate'] ) ? 'on' : '';

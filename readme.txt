@@ -97,7 +97,32 @@ If a provider responds with a retry-after header, the plugin sets a transient lo
 
 == Privacy ==
 
-This plugin sends image-derived payloads to the AI provider you choose when generating alt text. API keys are stored in WordPress options on your site and used only for outbound provider requests initiated by your server.
+This plugin sends image-derived payloads to the AI provider you choose when generating alt text (OpenAI, Anthropic, or Google Gemini). API keys are stored in WordPress options on your site and used only for outbound provider requests initiated by your server.
+
+== External Services ==
+
+This plugin connects to external AI services only when you use alt text generation features or test provider connectivity. Only the provider selected in plugin settings is contacted for a given request. This plugin sends the follow data:
+
+* API key (in Authorization header)
+* Selected model name
+* Prompt text (including your prompt seed and filename context)
+    * For alt-text generation: image MIME type and image binary content encoded as base64
+    * For Test Connection: a short text prompt ("Reply with: OK")
+
+= OpenAI API =
+
+* Terms: https://openai.com/policies/terms-of-use
+* Privacy: https://openai.com/policies/privacy-policy
+
+= Anthropic API =
+
+* Terms: https://www.anthropic.com/legal/commercial-terms
+* Privacy: https://www.anthropic.com/privacy
+
+= Google Gemini API =
+
+* Terms: https://ai.google.dev/terms
+* Privacy: https://policies.google.com/privacy
 
 == Screenshots ==
 
