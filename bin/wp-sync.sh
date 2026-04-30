@@ -46,6 +46,34 @@ readonly SVN_TAGS_DIR="$SVN_DIR/tags"
 readonly SVN_TRUNK_DIR="$SVN_DIR/trunk"
 readonly SVN_REPO="https://plugins.svn.wordpress.org/$PLUGIN_NAME"
 
+get_default_branch () {
+  cd "$GIT_DIR" || exit
+
+  if git show-ref --verify --quiet refs/heads/main; then
+    echo "main"
+    return
+  fi
+
+  echo "master"
+}
+
+get_stable_tag () {
+  local readme="$GIT_DIR/readme.txt"
+
+  if [ ! -f "$readme" ]; then
+    echo ""
+    return
+  fi
+
+  awk -F ':' 'BEGIN { IGNORECASE = 1 }
+    /^Stable tag[[:space:]]*:/ {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+      print $2
+      exit
+    }
+  ' "$readme"
+}
+
 fetch_svn_repo () {
   rm -rf "$SVN_DIR"
   echo "Fetch clean SVN repository."
@@ -139,6 +167,29 @@ sync_tag () {
   stage_and_commit_changes "Release tag $tag"
 }
 
+sync_stable_tag () {
+  local stable_tag=$1
+
+  if [ -z "$stable_tag" ] || [ "$stable_tag" = "trunk" ]; then
+    echo "Stable tag is missing or set to 'trunk'; skipping stable tag sync."
+    echo
+    return
+  fi
+
+  if [ -d "$SVN_TAGS_DIR/$stable_tag" ]; then
+    echo "Stable tag '$stable_tag' already exists in SVN."
+    echo
+    return
+  fi
+
+  echo "Creating missing stable SVN tag '$stable_tag' from trunk."
+  mkdir -p "$SVN_TAGS_DIR/$stable_tag"
+  sync_files "$SVN_TRUNK_DIR" "$SVN_TAGS_DIR/$stable_tag"
+
+  cd "$SVN_TAGS_DIR/$stable_tag" || exit
+  stage_and_commit_changes "Release tag $stable_tag"
+}
+
 sync_all_tags () {
   cd "$GIT_DIR" || exit
 
@@ -148,10 +199,12 @@ sync_all_tags () {
 }
 
 sync_trunk () {
+  local branch=$1
+
   cd "$GIT_DIR" || exit
 
-  echo "Checking out master branch."
-  git checkout master > /dev/null 2>&1
+  echo "Checking out $branch branch."
+  git checkout "$branch" > /dev/null 2>&1
 
   echo "Copying files over to svn repository in folder $SVN_TRUNK_DIR."
   sync_files . "$SVN_TRUNK_DIR"
@@ -161,8 +214,10 @@ sync_trunk () {
 }
 
 sync_assets () {
+  local branch=$1
+
   cd "$GIT_DIR" || exit
-  git checkout master > /dev/null 2>&1
+  git checkout "$branch" > /dev/null 2>&1
 
   if [ -d "$GIT_ASSETS_DIR" ]; then
     sync_files "$GIT_ASSETS_DIR" "$SVN_ASSETS_DIR"
@@ -175,8 +230,15 @@ sync_assets () {
 
 fetch_svn_repo
 fetch_git_repo
-sync_assets
+
+DEFAULT_BRANCH=$(get_default_branch)
+readonly DEFAULT_BRANCH
+
+sync_assets "$DEFAULT_BRANCH"
 sync_all_tags
-sync_trunk
+sync_trunk "$DEFAULT_BRANCH"
+
+STABLE_TAG=$(get_stable_tag)
+sync_stable_tag "$STABLE_TAG"
 
 exit 0
