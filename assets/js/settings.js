@@ -3,13 +3,50 @@
   const optionKey = data.optionKey || 'pwatg_settings';
   const serviceSelect = document.querySelector('select[name="' + optionKey + '[service]"]');
   const modelSelect = document.querySelector('select[name="' + optionKey + '[model]"]');
+  const connectorSourceInputs = document.querySelectorAll('input[name="' + optionKey + '[connector_source]"]');
+  const coreConnectorSelect = document.querySelector('select[name="' + optionKey + '[core_connector]"]');
+  const pluginApiKeyGroup = document.querySelector('.pwatg-plugin-api-key-group');
+  const coreConnectorWrap = document.querySelector('.pwatg-core-connector-wrap');
+  const serviceRow = serviceSelect.closest('tr');
+  const apiKeyRow = pluginApiKeyGroup ? pluginApiKeyGroup.closest('tr') : null;
+  const coreConnectorRow = coreConnectorWrap ? coreConnectorWrap.closest('tr') : null;
   const apiKeyWraps = document.querySelectorAll('.pwatg-api-key-wrap');
   const testForm = document.getElementById('pwatg-test-connection-form');
   const modelMap = data.modelMap || {};
   const currentModel = data.currentModel || '';
+  const hasCoreConnectors = !!data.hasCoreConnectors;
+  const coreConnectorServiceMap = data.coreConnectorServiceMap || {};
 
   if (!serviceSelect || !modelSelect) {
     return;
+  }
+
+  function getSelectedConnectorSource() {
+    if (!connectorSourceInputs.length) {
+      return 'plugin';
+    }
+
+    let selected = 'plugin';
+    connectorSourceInputs.forEach(function(input) {
+      if (input.checked) {
+        selected = input.value || 'plugin';
+      }
+    });
+
+    return selected;
+  }
+
+  function getServiceForCoreConnector() {
+    if (!coreConnectorSelect) {
+      return '';
+    }
+
+    const connectorId = coreConnectorSelect.value || '';
+    if (!connectorId || !Object.prototype.hasOwnProperty.call(coreConnectorServiceMap, connectorId)) {
+      return '';
+    }
+
+    return coreConnectorServiceMap[connectorId] || '';
   }
 
   function updateApiKeyField(service) {
@@ -43,7 +80,41 @@
   }
 
   function syncFields() {
-    const service = serviceSelect.value || 'openai';
+    const source = getSelectedConnectorSource();
+    let service = serviceSelect.value || 'openai';
+    const isCoreMode = hasCoreConnectors && source === 'core';
+
+    if (isCoreMode) {
+      const coreService = getServiceForCoreConnector();
+      if (coreService && modelMap[coreService]) {
+        service = coreService;
+        serviceSelect.value = coreService;
+      }
+      serviceSelect.setAttribute('disabled', 'disabled');
+    } else {
+      serviceSelect.removeAttribute('disabled');
+    }
+
+    if (serviceRow) {
+      serviceRow.classList.toggle('is-hidden', isCoreMode);
+    }
+
+    if (apiKeyRow) {
+      apiKeyRow.classList.toggle('is-hidden', isCoreMode);
+    }
+
+    if (coreConnectorRow) {
+      coreConnectorRow.classList.toggle('is-hidden', !isCoreMode);
+    }
+
+    if (pluginApiKeyGroup) {
+      pluginApiKeyGroup.classList.toggle('is-hidden', isCoreMode);
+    }
+
+    if (coreConnectorWrap) {
+      coreConnectorWrap.classList.toggle('is-hidden', !isCoreMode);
+    }
+
     updateApiKeyField(service);
     updateModels(service);
   }
@@ -55,7 +126,10 @@
 
     const service = serviceSelect.value || 'openai';
     const model = modelSelect.value || '';
-    const apiInput = document.querySelector('input[name="' + optionKey + '[api_keys][' + service + ']"]');
+    const source = getSelectedConnectorSource();
+    const apiInput = source === 'plugin'
+      ? document.querySelector('input[name="' + optionKey + '[api_keys][' + service + ']"]')
+      : null;
     const apiKey = apiInput ? apiInput.value : '';
 
     testForm.querySelector('input[name="service"]').value = service;
@@ -64,6 +138,14 @@
   }
 
   serviceSelect.addEventListener('change', syncFields);
+  if (coreConnectorSelect) {
+    coreConnectorSelect.addEventListener('change', syncFields);
+  }
+  if (connectorSourceInputs.length) {
+    connectorSourceInputs.forEach(function(input) {
+      input.addEventListener('change', syncFields);
+    });
+  }
   if (testForm) {
     testForm.addEventListener('submit', syncTestFormFields);
   }

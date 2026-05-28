@@ -3,7 +3,7 @@
  * Plugin Name: Presswell Alt Text Generator
  * Description: Generate AI-powered alt text for WordPress media.
  * Author: Presswell
- * Version: 1.0.0
+ * Version: 1.1.0
  * Plugin URI: https://wordpress.org/plugins/presswell-alt-text-generator
  * Author URI: https://presswell.co
  * License: GPLv2 or later

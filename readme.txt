@@ -2,8 +2,8 @@
 Contributors: presswell, benplum
 Tags: accessibility, alt text, media library, ai, image seo
 Requires at least: 6.1
-Tested up to: 6.9
-Stable tag: 1.0.0
+Tested up to: 7.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -132,6 +132,9 @@ This plugin connects to external AI services only when you use alt text generati
 4. Alt text generation controls in media modal.
 
 == Changelog ==
+
+= 1.1.0 =
+* Added WordPress 7.0 Core AI Connector support with connector mode setting.
 
 = 1.0.0 =
 * First public release with provider integrations, Media Library tools, and bulk generator.

@@ -238,17 +238,24 @@ trait PWATG_Providers_Trait {
    */
   public function generate_alt_text_for_attachment( $attachment_id, $force_regenerate = false ) {
     $attachment_id = absint( $attachment_id );
+    $settings         = $this->get_settings();
+    $connector_source = isset( $settings['connector_source'] ) ? sanitize_key( (string) $settings['connector_source'] ) : 'plugin';
+    if ( ! in_array( $connector_source, [ 'plugin', 'core' ], true ) ) {
+      $connector_source = 'plugin';
+    }
+
     $this->debug_log(
       'Starting alt text generation for attachment.',
       [
         'attachment_id'     => $attachment_id,
         'force_regenerate'  => (bool) $force_regenerate,
+        'connector_source'  => $connector_source,
       ]
     );
 
     if ( ! $attachment_id || ! wp_attachment_is_image( $attachment_id ) ) {
       $error = new WP_Error( 'pwatg_invalid_attachment', __( 'Invalid image attachment.', 'presswell-alt-text-generator' ) );
-      $this->debug_log( 'Alt generation failed: invalid attachment.', [ 'attachment_id' => $attachment_id ] );
+      $this->debug_log( 'Alt generation failed: invalid attachment.', [ 'attachment_id' => $attachment_id, 'connector_source' => $connector_source ] );
       return $error;
     }
 
@@ -257,9 +264,10 @@ trait PWATG_Providers_Trait {
       $this->debug_log(
         'Alt generation blocked by rate limit lock.',
         [
-          'attachment_id' => $attachment_id,
-          'code'          => $lock_error->get_error_code(),
-          'message'       => $lock_error->get_error_message(),
+          'attachment_id'    => $attachment_id,
+          'connector_source' => $connector_source,
+          'code'             => $lock_error->get_error_code(),
+          'message'          => $lock_error->get_error_message(),
         ]
       );
       return $lock_error;
@@ -267,11 +275,9 @@ trait PWATG_Providers_Trait {
 
     $current_alt = trim( (string) get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
     if ( ! $force_regenerate && '' !== $current_alt ) {
-      $this->debug_log( 'Alt generation skipped because alt text already exists.', [ 'attachment_id' => $attachment_id ] );
+      $this->debug_log( 'Alt generation skipped because alt text already exists.', [ 'attachment_id' => $attachment_id, 'connector_source' => $connector_source ] );
       return false;
     }
-
-    $settings = $this->get_settings();
 
     $file_path = get_attached_file( $attachment_id );
     if ( ! $file_path || ! file_exists( $file_path ) ) {
@@ -347,9 +353,18 @@ trait PWATG_Providers_Trait {
       $prompt_seed = $defaults['prompt_seed'];
     }
 
-    $full_prompt = trim( $prompt_seed ) . "\n\n" . $prompt;
-    $service     = isset( $settings['service'] ) ? sanitize_key( $settings['service'] ) : 'openai';
-    $model       = isset( $settings['model'] ) ? trim( (string) $settings['model'] ) : '';
+    $full_prompt      = trim( $prompt_seed ) . "\n\n" . $prompt;
+    $service          = isset( $settings['service'] ) ? sanitize_key( $settings['service'] ) : 'openai';
+    $model            = isset( $settings['model'] ) ? trim( (string) $settings['model'] ) : '';
+    $connector_source = isset( $settings['connector_source'] ) ? sanitize_key( $settings['connector_source'] ) : 'plugin';
+    $core_connector   = isset( $settings['core_connector'] ) ? sanitize_key( $settings['core_connector'] ) : '';
+
+    if ( 'core' === $connector_source && method_exists( $this, 'get_core_service_for_connector' ) ) {
+      $core_service   = $this->get_core_service_for_connector( $core_connector );
+      if ( '' !== $core_service ) {
+        $service = $core_service;
+      }
+    }
 
     $this->debug_log(
       'Prepared provider request context for attachment.',
@@ -357,27 +372,22 @@ trait PWATG_Providers_Trait {
         'attachment_id' => $attachment_id,
         'service'       => $service,
         'model'         => $model,
+        'connector_source' => $connector_source,
+        'core_connector'   => $core_connector,
       ]
     );
 
     if ( '' === $model ) {
       $error = new WP_Error( 'pwatg_missing_model', __( 'Missing model in Presswell Alt Text settings.', 'presswell-alt-text-generator' ) );
-      $this->debug_log( 'Alt generation failed: missing model.', [ 'attachment_id' => $attachment_id ] );
+      $this->debug_log( 'Alt generation failed: missing model.', [ 'attachment_id' => $attachment_id, 'connector_source' => $connector_source, 'core_connector' => $core_connector ] );
       return $error;
     }
 
-    $api_key = '';
-    if ( isset( $settings['api_keys'][ $service ] ) ) {
-      $api_key = trim( (string) $settings['api_keys'][ $service ] );
-    }
-
-    if ( '' === $api_key && isset( $settings['api_key'] ) ) {
-      $api_key = trim( (string) $settings['api_key'] );
-    }
+    $api_key = $this->resolve_service_api_key( $service, $settings );
 
     if ( '' === $api_key ) {
-      $error = new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings.', 'presswell-alt-text-generator' ) );
-      $this->debug_log( 'Alt generation failed: missing API key.', [ 'attachment_id' => $attachment_id, 'service' => $service ] );
+      $error = new WP_Error( 'pwatg_missing_api_key', __( 'Missing API key in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ) );
+      $this->debug_log( 'Alt generation failed: missing API key.', [ 'attachment_id' => $attachment_id, 'service' => $service, 'connector_source' => $connector_source, 'core_connector' => $core_connector ] );
       return $error;
     }
 
@@ -391,6 +401,8 @@ trait PWATG_Providers_Trait {
           'attachment_id' => $attachment_id,
           'service'       => $service,
           'model'         => $model,
+          'connector_source' => $connector_source,
+          'core_connector'   => $core_connector,
           'code'          => $alt_text->get_error_code(),
           'message'       => $alt_text->get_error_message(),
         ]
@@ -401,7 +413,7 @@ trait PWATG_Providers_Trait {
     $alt_text = sanitize_text_field( $alt_text );
     if ( '' === $alt_text ) {
       $error = new WP_Error( 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ) );
-      $this->debug_log( 'Provider returned empty alt text.', [ 'attachment_id' => $attachment_id, 'service' => $service, 'model' => $model ] );
+      $this->debug_log( 'Provider returned empty alt text.', [ 'attachment_id' => $attachment_id, 'service' => $service, 'model' => $model, 'connector_source' => $connector_source, 'core_connector' => $core_connector ] );
       return $error;
     }
 
@@ -418,6 +430,8 @@ trait PWATG_Providers_Trait {
         'attachment_id' => $attachment_id,
         'service'       => $service,
         'model'         => $model,
+        'connector_source' => $connector_source,
+        'core_connector'   => $core_connector,
         'alt_length'    => mb_strlen( $alt_text ),
       ]
     );
@@ -447,5 +461,135 @@ trait PWATG_Providers_Trait {
 
   protected function request_gemini_text( $api_key, $model, $prompt ) {
     return PWATG_Gemini_Service::request_text( $api_key, $model, $prompt );
+  }
+
+  /**
+   * Resolve an API key from plugin settings, then fall back to WP 7.0 AI connectors.
+   *
+   * @param string $service  Provider slug.
+   * @param array  $settings Saved plugin settings.
+   *
+   * @return string
+   */
+  protected function resolve_service_api_key( $service, array $settings ) {
+    $service = sanitize_key( (string) $service );
+    $source  = isset( $settings['connector_source'] ) ? sanitize_key( $settings['connector_source'] ) : 'plugin';
+    $api_key = '';
+
+    if ( 'core' === $source && method_exists( $this, 'get_api_key_for_core_connector' ) ) {
+      $core_connector = isset( $settings['core_connector'] ) ? sanitize_key( $settings['core_connector'] ) : '';
+      $api_key        = trim( (string) $this->get_api_key_for_core_connector( $core_connector ) );
+
+      if ( '' !== $api_key ) {
+        return $api_key;
+      }
+    }
+
+    if ( isset( $settings['api_keys'][ $service ] ) ) {
+      $api_key = trim( (string) $settings['api_keys'][ $service ] );
+    }
+
+    if ( '' === $api_key && isset( $settings['api_key'] ) ) {
+      $api_key = trim( (string) $settings['api_key'] );
+    }
+
+    if ( '' !== $api_key ) {
+      return $api_key;
+    }
+
+    return $this->get_wp_connector_api_key_for_service( $service );
+  }
+
+  /**
+   * Find an API key for a provider from WordPress AI connectors.
+   *
+   * @param string $service Provider slug.
+   *
+   * @return string
+   */
+  protected function get_wp_connector_api_key_for_service( $service ) {
+    $service = sanitize_key( (string) $service );
+    if ( '' === $service ) {
+      return '';
+    }
+
+    $connector_candidates = [
+      'openai'    => [ 'openai' ],
+      'anthropic' => [ 'anthropic' ],
+      'gemini'    => [ 'google', 'gemini' ],
+    ];
+
+    $connector_candidates = apply_filters( 'pwatg_service_connector_candidates', $connector_candidates );
+    $connector_ids        = isset( $connector_candidates[ $service ] ) && is_array( $connector_candidates[ $service ] )
+      ? $connector_candidates[ $service ]
+      : [ $service ];
+
+    $possible_option_names = [];
+    foreach ( $connector_ids as $connector_id ) {
+      $connector_id = sanitize_key( (string) $connector_id );
+      if ( '' === $connector_id ) {
+        continue;
+      }
+
+      $possible_option_names[] = 'connectors_ai_' . str_replace( '-', '_', $connector_id ) . '_api_key';
+
+      if ( function_exists( 'wp_get_connector' ) ) {
+        $connector = wp_get_connector( $connector_id );
+        if ( is_array( $connector ) && isset( $connector['type'] ) && 'ai_provider' === $connector['type'] ) {
+          $auth = isset( $connector['authentication'] ) && is_array( $connector['authentication'] )
+            ? $connector['authentication']
+            : [];
+
+          if ( isset( $auth['env_var_name'] ) && is_string( $auth['env_var_name'] ) && '' !== $auth['env_var_name'] ) {
+            $env_value = getenv( $auth['env_var_name'] );
+            if ( is_string( $env_value ) && '' !== trim( $env_value ) ) {
+              return trim( $env_value );
+            }
+          }
+
+          if ( isset( $auth['constant_name'] ) && is_string( $auth['constant_name'] ) && '' !== $auth['constant_name'] && defined( $auth['constant_name'] ) ) {
+            $constant_value = constant( $auth['constant_name'] );
+            if ( is_string( $constant_value ) && '' !== trim( $constant_value ) ) {
+              return trim( $constant_value );
+            }
+          }
+
+          if ( isset( $auth['setting_name'] ) && is_string( $auth['setting_name'] ) && '' !== $auth['setting_name'] ) {
+            $possible_option_names[] = $auth['setting_name'];
+          }
+        }
+      }
+    }
+
+    foreach ( array_values( array_unique( array_filter( $possible_option_names ) ) ) as $setting_name ) {
+      $key = $this->get_provider_connector_setting_option( $setting_name );
+      if ( '' !== $key ) {
+        return $key;
+      }
+    }
+
+    return '';
+  }
+
+  /**
+   * Read a connector setting from the effective site context.
+   *
+   * @param string $setting_name Option name.
+   *
+   * @return string
+   */
+  protected function get_provider_connector_setting_option( $setting_name ) {
+    $setting_name = (string) $setting_name;
+    if ( '' === $setting_name ) {
+      return '';
+    }
+
+    if ( is_multisite() && function_exists( 'get_blog_option' ) ) {
+      $raw_value = get_blog_option( get_main_site_id(), $setting_name, '' );
+    } else {
+      $raw_value = get_option( $setting_name, '' );
+    }
+
+    return is_string( $raw_value ) ? trim( $raw_value ) : '';
   }
 }

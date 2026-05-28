@@ -301,7 +301,7 @@ trait PWATG_Media_Trait {
     $messages = [
       'updated'     => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
       'skipped'     => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
-      'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', 'presswell-alt-text-generator' ),
+      'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
       'error'       => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
     ];
 
@@ -408,7 +408,7 @@ trait PWATG_Media_Trait {
       $messages = [
         'updated'     => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
         'skipped'     => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
-        'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings.', 'presswell-alt-text-generator' ),
+        'missing_key' => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
         'error'       => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
       ];
 

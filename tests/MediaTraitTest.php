@@ -51,6 +51,69 @@ class MediaTraitTest extends WP_UnitTestCase {
     $this->assertSame( 'pwatg_invalid_attachment', $result->get_error_code() );
   }
 
+  public function test_generate_alt_text_uses_wp_connector_api_key_fallback() {
+    $attachment_id = $this->create_image_attachment();
+
+    $settings = $this->plugin->get_settings();
+    $settings['service'] = 'openai';
+    $settings['connector_source'] = 'core';
+    $settings['core_connector'] = 'openai';
+    $settings['api_keys']['openai'] = '';
+    $settings['api_key'] = '';
+    update_option( PWATG::SETTINGS_KEY, $settings );
+
+    update_option( 'connectors_ai_openai_api_key', 'connector-openai-key' );
+
+    $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, false );
+
+    $this->assertTrue( $result );
+    $this->assertSame( 'connector-openai-key', PWATG_Test_Provider::$last_request['api_key'] );
+
+    delete_option( 'connectors_ai_openai_api_key' );
+  }
+
+  public function test_generate_alt_text_prefers_plugin_key_when_source_is_plugin() {
+    $attachment_id = $this->create_image_attachment();
+
+    $settings = $this->plugin->get_settings();
+    $settings['connector_source'] = 'plugin';
+    $settings['core_connector'] = 'openai';
+    $settings['service'] = 'openai';
+    $settings['api_keys']['openai'] = 'plugin-openai-key';
+    $settings['api_key'] = '';
+    update_option( PWATG::SETTINGS_KEY, $settings );
+
+    update_option( 'connectors_ai_openai_api_key', 'core-openai-key' );
+
+    $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, false );
+
+    $this->assertTrue( $result );
+    $this->assertSame( 'plugin-openai-key', PWATG_Test_Provider::$last_request['api_key'] );
+
+    delete_option( 'connectors_ai_openai_api_key' );
+  }
+
+  public function test_generate_alt_text_prefers_core_key_when_source_is_core() {
+    $attachment_id = $this->create_image_attachment();
+
+    $settings = $this->plugin->get_settings();
+    $settings['connector_source'] = 'core';
+    $settings['core_connector'] = 'openai';
+    $settings['service'] = 'openai';
+    $settings['api_keys']['openai'] = 'plugin-openai-key';
+    $settings['api_key'] = '';
+    update_option( PWATG::SETTINGS_KEY, $settings );
+
+    update_option( 'connectors_ai_openai_api_key', 'core-openai-key' );
+
+    $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, false );
+
+    $this->assertTrue( $result );
+    $this->assertSame( 'core-openai-key', PWATG_Test_Provider::$last_request['api_key'] );
+
+    delete_option( 'connectors_ai_openai_api_key' );
+  }
+
   public function test_auto_generate_runs_on_upload_filter() {
     $attachment_id = $this->create_image_attachment();
     PWATG_Test_Provider::$response = 'Auto alt text';

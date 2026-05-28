@@ -20,6 +20,8 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertArrayHasKey( 'model', $defaults );
     $this->assertArrayHasKey( 'prompt_seed', $defaults );
     $this->assertArrayHasKey( 'api_keys', $defaults );
+    $this->assertArrayHasKey( 'connector_source', $defaults );
+    $this->assertArrayHasKey( 'core_connector', $defaults );
     $this->assertArrayHasKey( 'auto_generate', $defaults );
     $this->assertArrayHasKey( 'debug_logging', $defaults );
 
@@ -27,8 +29,16 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertSame( 'gpt-4.1-mini', $defaults['model'] );
     $this->assertIsArray( $defaults['api_keys'] );
     $this->assertArrayHasKey( 'openai', $defaults['api_keys'] );
+    $this->assertContains( $defaults['connector_source'], [ 'plugin', 'core' ] );
+    $this->assertIsString( $defaults['core_connector'] );
     $this->assertSame( 'on', $defaults['auto_generate'] );
     $this->assertSame( 'off', $defaults['debug_logging'] );
+  }
+
+  public function test_core_connector_service_mapping_supports_google_to_gemini() {
+    $this->assertSame( 'gemini', $this->plugin->get_core_service_for_connector( 'google' ) );
+    $this->assertSame( 'openai', $this->plugin->get_core_service_for_connector( 'openai' ) );
+    $this->assertSame( '', $this->plugin->get_core_service_for_connector( 'unknown-provider' ) );
   }
 
   public function test_get_settings_merges_saved_values_with_defaults() {

@@ -54,6 +54,15 @@ trait PWATG_Assets_Trait {
       $settings  = $this->get_settings();
       $model_map = [];
       $services  = array_keys( $this->get_available_services() );
+      $core_connectors = method_exists( $this, 'get_active_core_connector_choices' )
+        ? $this->get_active_core_connector_choices()
+        : [];
+      $core_connector_service_map = [];
+      foreach ( $core_connectors as $connector_id => $connector ) {
+        if ( isset( $connector['service'] ) ) {
+          $core_connector_service_map[ $connector_id ] = sanitize_key( (string) $connector['service'] );
+        }
+      }
       foreach ( $services as $service ) {
         $model_map[ $service ] = $this->get_available_models( $service );
       }
@@ -73,6 +82,10 @@ trait PWATG_Assets_Trait {
           'optionKey'    => PWATG::SETTINGS_KEY,
           'modelMap'     => $model_map,
           'currentModel' => (string) $settings['model'],
+          'connectorSource' => isset( $settings['connector_source'] ) ? (string) $settings['connector_source'] : 'plugin',
+          'coreConnector' => isset( $settings['core_connector'] ) ? (string) $settings['core_connector'] : '',
+          'hasCoreConnectors' => ! empty( $core_connectors ),
+          'coreConnectorServiceMap' => $core_connector_service_map,
         ]
       );
     }
@@ -166,7 +179,7 @@ trait PWATG_Assets_Trait {
             'never'             => __( 'Never', 'presswell-alt-text-generator' ),
             'updated'           => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
             'skipped'           => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
-            'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings.', 'presswell-alt-text-generator' ),
+            'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
             'error'             => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
           ],
         ]

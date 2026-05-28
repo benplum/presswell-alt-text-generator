@@ -77,7 +77,7 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
 
     $this->assertFalse( $response['success'] );
     $this->assertSame( 'missing_key', $response['data']['status'] );
-    $this->assertSame( 'Missing API key. Add it in Alt Text Generator settings.', $response['data']['message'] );
+    $this->assertSame( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', $response['data']['message'] );
   }
 
   public function test_ajax_handler_requires_permissions() {
