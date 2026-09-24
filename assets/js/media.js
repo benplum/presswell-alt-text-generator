@@ -278,7 +278,7 @@ jQuery(function($) {
 
     setButtonBusy($button, true);
 
-    $.post(window.ajaxurl, {
+    $.post(data.ajaxUrl || window.ajaxurl, {
       action: ajaxAction,
       attachment_id: attachmentId,
       nonce: nonce
@@ -406,18 +406,39 @@ jQuery(function($) {
     placeForMediaModal();
   }
 
+  let refreshTimer = null;
+
+  // Coalesce bursts of events into one placement pass.
+  function scheduleRefresh() {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(refreshPlacement, 50);
+  }
+
   refreshPlacement();
   setTimeout(refreshPlacement, 250);
   setTimeout(refreshPlacement, 700);
   setTimeout(refreshPlacement, 1200);
 
-  $(document).on('keyup change', function() {
-    refreshPlacement();
-  });
+  // The Generate action is a compat field, so re-place it whenever the media modal
+  // renders an attachment's compat fields (selecting another image, for example).
+  if (window.wp && wp.media && wp.media.view && wp.media.view.AttachmentCompat) {
+    const renderCompat = wp.media.view.AttachmentCompat.prototype.render;
 
-  $(document).on('attachment:compat:ready wp-mediaelement-loaded', function() {
-    refreshPlacement();
-  });
+    wp.media.view.AttachmentCompat.prototype.render = function() {
+      const result = renderCompat.apply(this, arguments);
+      scheduleRefresh();
+      return result;
+    };
+  }
+
+  // Only the alt field changes the button's label.
+  $(document).on(
+    'input change',
+    'input[name="_wp_attachment_image_alt"], textarea[name="_wp_attachment_image_alt"], .setting[data-setting="alt"] input, .setting[data-setting="alt"] textarea',
+    scheduleRefresh
+  );
+
+  $(document).on('attachment:compat:ready wp-mediaelement-loaded', scheduleRefresh);
 
   $(document).on('click', 'a.pwatg-generate-alt-action, .pwatg-inline-action a.button, .pwatg-inline-action a.button-secondary', handleGenerateClick);
 });

@@ -34,7 +34,7 @@ trait PWATG_Providers_Trait {
 
     $remaining = max( 0, $lock['until'] - time() );
     if ( $remaining <= 0 ) {
-      delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
+      $this->delete_rate_limit_transient();
       return null;
     }
 
@@ -119,7 +119,7 @@ trait PWATG_Providers_Trait {
       'until'    => time() + $duration,
     ];
 
-    set_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration );
+    $this->set_rate_limit_transient( $payload, $duration );
   }
 
   /** Determine how long a lock should last given the error payload. */
@@ -204,7 +204,7 @@ trait PWATG_Providers_Trait {
 
   /** Fetch the raw transient payload storing rate-limit metadata. */
   protected function get_raw_rate_limit_lock() {
-    $lock = get_transient( PWATG::RATE_LIMIT_TRANSIENT );
+    $lock = $this->get_rate_limit_transient();
     if ( ! is_array( $lock ) ) {
       return null;
     }
@@ -214,11 +214,33 @@ trait PWATG_Providers_Trait {
     $lock['provider'] = isset( $lock['provider'] ) ? sanitize_key( (string) $lock['provider'] ) : '';
 
     if ( $lock['until'] <= time() ) {
-      delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
+      $this->delete_rate_limit_transient();
       return null;
     }
 
     return $lock;
+  }
+
+  /*
+   * The lock is network-wide on Multisite: every site uses the main site's API key,
+   * so a limit hit on one site applies to all of them.
+   */
+
+  /** @return mixed Stored lock payload. */
+  protected function get_rate_limit_transient() {
+    return is_multisite() ? get_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : get_transient( PWATG::RATE_LIMIT_TRANSIENT );
+  }
+
+  /**
+   * @param array $payload  Lock payload.
+   * @param int   $duration Seconds.
+   */
+  protected function set_rate_limit_transient( array $payload, $duration ) {
+    return is_multisite() ? set_site_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration ) : set_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration );
+  }
+
+  protected function delete_rate_limit_transient() {
+    return is_multisite() ? delete_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
   }
 
   /** Convenience wrapper returning the formatted notice text. */
@@ -279,73 +301,26 @@ trait PWATG_Providers_Trait {
       return false;
     }
 
-    $file_path = get_attached_file( $attachment_id );
-    if ( ! $file_path || ! file_exists( $file_path ) ) {
-      return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', 'presswell-alt-text-generator' ) );
+    $image = $this->prepare_image_for_request( $attachment_id );
+    if ( is_wp_error( $image ) ) {
+      $this->debug_log( 'Alt generation failed: image could not be prepared.', [ 'attachment_id' => $attachment_id, 'code' => $image->get_error_code() ] );
+      return $image;
     }
 
-    $file_size     = filesize( $file_path );
-    $max_size      = 5 * 1024 * 1024;
-    $used_fallback = false;
-
-    if ( false === $file_size ) {
-      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
-    }
-
-    // If original is too large, try generated subsizes before failing.
-    if ( $file_size > $max_size ) {
-      $sizes_to_try = [ 'large', 'medium_large', 'medium', /* 'thumbnail' */ ];
-      $base_dir     = trailingslashit( pathinfo( $file_path, PATHINFO_DIRNAME ) );
-
-      foreach ( $sizes_to_try as $size ) {
-        $intermediate = image_get_intermediate_size( $attachment_id, $size );
-        if ( ! is_array( $intermediate ) || empty( $intermediate['file'] ) ) {
-          continue;
-        }
-
-        $scaled_path = $base_dir . ltrim( (string) $intermediate['file'], '/' );
-        if ( ! file_exists( $scaled_path ) ) {
-          continue;
-        }
-
-        $scaled_size = filesize( $scaled_path );
-        if ( false === $scaled_size || $scaled_size > $max_size ) {
-          continue;
-        }
-
-        $file_path     = $scaled_path;
-        $file_size     = $scaled_size;
-        $used_fallback = true;
-        break;
-      }
-
-      if ( ! $used_fallback ) {
-        return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', 'presswell-alt-text-generator' ) );
-      }
-    }
-
-    $image_binary = file_get_contents( $file_path );
-    if ( false === $image_binary ) {
-      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
-    }
-
-    $mime_type = get_post_mime_type( $attachment_id );
-    if ( empty( $mime_type ) ) {
-      $mime_type = 'image/jpeg';
-    }
-    // If we used a fallback file, infer type from the selected file path.
-    if ( $used_fallback ) {
-      $filetype = wp_check_filetype( wp_basename( $file_path ) );
-      if ( ! empty( $filetype['type'] ) ) {
-        $mime_type = $filetype['type'];
-      }
-    }
+    $image_binary = $image['binary'];
+    $mime_type    = $image['mime_type'];
 
     $prompt = sprintf(
       /* translators: %s: filename */
       __( 'Filename context: %s. Return only the alt text with no quotes.', 'presswell-alt-text-generator' ),
-      basename( $file_path )
+      wp_basename( (string) get_attached_file( $attachment_id ) )
     );
+
+    $language = $this->get_alt_text_language();
+    if ( '' !== $language ) {
+      // Alt text is site content, so it follows the site language, not the admin's.
+      $prompt .= ' ' . sprintf( 'Write the alt text in %s.', $language );
+    }
 
     $prompt_seed = isset( $settings['prompt_seed'] ) ? trim( (string) $settings['prompt_seed'] ) : '';
     if ( '' === $prompt_seed ) {
@@ -417,9 +392,7 @@ trait PWATG_Providers_Trait {
       return $error;
     }
 
-    if ( mb_strlen( $alt_text ) > 220 ) {
-      $alt_text = mb_substr( $alt_text, 0, 220 );
-    }
+    $alt_text = $this->limit_alt_text_length( $alt_text, 220 );
 
     update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, $alt_text );
     update_post_meta( $attachment_id, PWATG::META_KEY_LAST_GENERATED, (string) current_time( 'timestamp', true ) );
@@ -437,6 +410,204 @@ trait PWATG_Providers_Trait {
     );
 
     return true;
+  }
+
+  /**
+   * Load the image to send: a web-sized copy in a format every provider accepts.
+   *
+   * Sending the original wastes upload time and tokens, since providers scale large
+   * images down anyway. Picks the smallest existing file that is at least the target
+   * size on its long edge, and converts to JPEG when the file is a format some
+   * providers reject (AVIF, HEIC, GIF) or is still over the size limit.
+   *
+   * @param int $attachment_id Attachment ID.
+   *
+   * @return array{binary: string, mime_type: string, file: string}|WP_Error
+   */
+  protected function prepare_image_for_request( $attachment_id ) {
+    $original = get_attached_file( $attachment_id );
+    if ( ! $original || ! file_exists( $original ) ) {
+      return new WP_Error( 'pwatg_missing_file', __( 'Image file does not exist.', 'presswell-alt-text-generator' ) );
+    }
+
+    $target    = max( 256, (int) apply_filters( 'pwatg_image_max_dimension', 1024, $attachment_id ) );
+    $max_bytes = 5 * MB_IN_BYTES;
+    $supported = [ 'image/jpeg', 'image/png', 'image/webp' ];
+    $candidate = $this->choose_image_file( $attachment_id, $original, $target );
+
+    $filetype  = wp_check_filetype( $candidate['path'] );
+    $mime_type = ! empty( $filetype['type'] ) ? $filetype['type'] : (string) get_post_mime_type( $attachment_id );
+    $file_size = filesize( $candidate['path'] );
+
+    if ( false === $file_size ) {
+      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
+    }
+
+    if ( ! in_array( $mime_type, $supported, true ) || $file_size > $max_bytes ) {
+      return $this->convert_image_to_jpeg( $candidate['path'], $target, $max_bytes );
+    }
+
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a local media file.
+    $binary = file_get_contents( $candidate['path'] );
+    if ( false === $binary ) {
+      return new WP_Error( 'pwatg_unreadable_file', __( 'Could not read image file.', 'presswell-alt-text-generator' ) );
+    }
+
+    return [
+      'binary'    => $binary,
+      'mime_type' => $mime_type,
+      'file'      => $candidate['path'],
+    ];
+  }
+
+  /**
+   * Pick the smallest file on disk whose long edge reaches the target, else the largest.
+   *
+   * @param int    $attachment_id Attachment ID.
+   * @param string $original      Absolute path of the original.
+   * @param int    $target        Target long edge in pixels.
+   *
+   * @return array{path: string, long_edge: int}
+   */
+  protected function choose_image_file( $attachment_id, $original, $target ) {
+    $metadata = wp_get_attachment_metadata( $attachment_id );
+    $base_dir = trailingslashit( dirname( $original ) );
+    $files    = [
+      [
+        'path'      => $original,
+        'long_edge' => is_array( $metadata ) ? max( (int) ( $metadata['width'] ?? 0 ), (int) ( $metadata['height'] ?? 0 ) ) : 0,
+      ],
+    ];
+
+    if ( is_array( $metadata ) && ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+      foreach ( $metadata['sizes'] as $size ) {
+        if ( empty( $size['file'] ) ) {
+          continue;
+        }
+
+        // Some plugins list sizes that are generated on demand, so check the disk.
+        $path = $base_dir . wp_basename( (string) $size['file'] );
+        if ( file_exists( $path ) ) {
+          $files[] = [
+            'path'      => $path,
+            'long_edge' => max( (int) ( $size['width'] ?? 0 ), (int) ( $size['height'] ?? 0 ) ),
+          ];
+        }
+      }
+    }
+
+    $large_enough = array_filter(
+      $files,
+      static function ( $file ) use ( $target ) {
+        return $file['long_edge'] >= $target;
+      }
+    );
+
+    $pool = $large_enough ? $large_enough : $files;
+    usort(
+      $pool,
+      static function ( $a, $b ) use ( $large_enough ) {
+        return $large_enough ? $a['long_edge'] <=> $b['long_edge'] : $b['long_edge'] <=> $a['long_edge'];
+      }
+    );
+
+    return reset( $pool );
+  }
+
+  /**
+   * Re-encode an image as a JPEG no larger than the target, in memory.
+   *
+   * @param string $path      Source file.
+   * @param int    $target    Target long edge in pixels.
+   * @param int    $max_bytes Maximum encoded size.
+   *
+   * @return array{binary: string, mime_type: string, file: string}|WP_Error
+   */
+  protected function convert_image_to_jpeg( $path, $target, $max_bytes ) {
+    $editor = wp_get_image_editor( $path );
+    if ( is_wp_error( $editor ) ) {
+      return new WP_Error( 'pwatg_unsupported_image', __( 'This image format cannot be sent for alt text generation on this server.', 'presswell-alt-text-generator' ) );
+    }
+
+    $editor->resize( $target, $target, false );
+
+    if ( ! function_exists( 'wp_tempnam' ) ) {
+      require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+
+    $temp  = wp_tempnam( 'pwatg-image' );
+    $saved = $editor->save( $temp, 'image/jpeg' );
+    if ( is_wp_error( $saved ) || empty( $saved['path'] ) ) {
+      if ( $temp && file_exists( $temp ) ) {
+        wp_delete_file( $temp );
+      }
+
+      return new WP_Error( 'pwatg_unsupported_image', __( 'This image format cannot be sent for alt text generation on this server.', 'presswell-alt-text-generator' ) );
+    }
+
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a temporary local file.
+    $binary = file_get_contents( $saved['path'] );
+
+    foreach ( array_unique( [ $temp, $saved['path'] ] ) as $file ) {
+      if ( $file && file_exists( $file ) ) {
+        wp_delete_file( $file );
+      }
+    }
+
+    if ( false === $binary || strlen( $binary ) > $max_bytes ) {
+      return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', 'presswell-alt-text-generator' ) );
+    }
+
+    return [
+      'binary'    => $binary,
+      'mime_type' => 'image/jpeg',
+      'file'      => $path,
+    ];
+  }
+
+  /**
+   * The site language, named for the model (for example "German").
+   *
+   * @return string
+   */
+  protected function get_alt_text_language() {
+    $locale   = get_locale();
+    $language = $locale;
+
+    if ( class_exists( 'Locale' ) ) {
+      $name = Locale::getDisplayLanguage( $locale, 'en' );
+      if ( is_string( $name ) && '' !== $name && strtolower( $name ) !== strtolower( $locale ) ) {
+        $region   = Locale::getDisplayRegion( $locale, 'en' );
+        $language = $region ? $name . ' (' . $region . ')' : $name;
+      }
+    }
+
+    /**
+     * Filter the language alt text is written in. Return '' to leave it to the model.
+     *
+     * @param string $language Language name, or the locale code when PHP intl is missing.
+     * @param string $locale   Site locale.
+     */
+    return trim( (string) apply_filters( 'pwatg_alt_text_language', $language, $locale ) );
+  }
+
+  /**
+   * Shorten alt text at a word boundary.
+   *
+   * @param string $alt_text Alt text.
+   * @param int    $limit    Maximum characters.
+   *
+   * @return string
+   */
+  protected function limit_alt_text_length( $alt_text, $limit ) {
+    if ( mb_strlen( $alt_text ) <= $limit ) {
+      return $alt_text;
+    }
+
+    $cut   = mb_substr( $alt_text, 0, $limit );
+    $space = mb_strrpos( $cut, ' ' );
+
+    return rtrim( false !== $space && $space > $limit * 0.6 ? mb_substr( $cut, 0, $space ) : $cut, " ,;:-" );
   }
 
   protected function request_openai_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {

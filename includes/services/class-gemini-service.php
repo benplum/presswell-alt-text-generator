@@ -6,7 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
   /** Interface to Google's Gemini generative language endpoint. */
-  class PWATG_Gemini_Service {
+  class PWATG_Gemini_Service extends PWATG_Provider_Service {
+    const PROVIDER = 'gemini';
+
     /** Request alt text for a specific image. */
     public static function request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
       if ( '' === trim( (string) $api_key ) ) {
@@ -34,8 +36,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
         ],
       ];
 
-      $url = self::build_url( $model, $api_key );
-      $response = self::request( $url, $body, 45 );
+      $response = self::request( self::build_url( $model ), $api_key, $body, 45 );
       if ( is_wp_error( $response ) ) {
         return $response;
       }
@@ -64,8 +65,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
         ],
       ];
 
-      $url = self::build_url( $model, $api_key );
-      $response = self::request( $url, $body, 30 );
+      $response = self::request( self::build_url( $model ), $api_key, $body, 30 );
       if ( is_wp_error( $response ) ) {
         return $response;
       }
@@ -73,18 +73,24 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return self::extract_text_parts( $response, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text-generator' ) );
     }
 
-    /** Compose the REST endpoint for the selected model/key. */
-    private static function build_url( $model, $api_key ) {
-      return 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $api_key );
+    /** Compose the REST endpoint for the selected model. */
+    private static function build_url( $model ) {
+      return 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent';
     }
 
-    /** Fire a POST request and convert failures to WP_Error. */
-    private static function request( $url, array $body, $timeout ) {
+    /**
+     * Fire a POST request and convert failures to WP_Error.
+     *
+     * The key goes in a header rather than the query string, so it stays out of
+     * request URLs that proxies, HTTP logs, and error messages may record.
+     */
+    private static function request( $url, $api_key, array $body, $timeout ) {
       $response = wp_remote_post(
         $url,
         [
           'headers' => [
-            'Content-Type' => 'application/json',
+            'Content-Type'   => 'application/json',
+            'x-goog-api-key' => $api_key,
           ],
           'body'    => wp_json_encode( $body ),
           'timeout' => $timeout,
@@ -95,15 +101,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
         return $response;
       }
 
-      $http_code = wp_remote_retrieve_response_code( $response );
-      $data      = json_decode( wp_remote_retrieve_body( $response ), true );
-
-      if ( $http_code < 200 || $http_code >= 300 ) {
-        $error_message = isset( $data['error']['message'] ) ? sanitize_text_field( $data['error']['message'] ) : __( 'Unknown API error.', 'presswell-alt-text-generator' );
-        return self::build_api_error( $http_code, $error_message, $response );
-      }
-
-      return is_array( $data ) ? $data : [];
+      return self::decode_or_error( $response );
     }
 
     /** Extract the concatenated text parts from a successful response. */
@@ -125,42 +123,14 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       return new WP_Error( $error_code, $error_message );
     }
 
-    /** Normalize provider errors and capture retry metadata. */
-    private static function build_api_error( $http_code, $error_message, $response ) {
-      $code = 'pwatg_api_error';
-      if ( 429 === $http_code ) {
-        $code = 'pwatg_rate_limited';
-      } elseif ( in_array( $http_code, [ 402, 403 ], true ) ) {
-        $code = 'pwatg_quota_exceeded';
-      }
-
-      $data = [
-        'http_code' => $http_code,
-        'provider'  => 'gemini',
-      ];
-
-      $retry_after = self::parse_retry_after_header( $response );
-      if ( $retry_after > 0 ) {
-        $data['retry_after'] = $retry_after;
-      }
-
-      return new WP_Error( $code, $error_message, $data );
+    /** Gemini reports both rate and quota limits as 429 RESOURCE_EXHAUSTED; the message tells them apart. */
+    protected static function is_quota_error( $http_code, array $body, $message ) {
+      return 429 === $http_code && false !== stripos( $message, 'quota' );
     }
 
-    /** Retrieve Retry-After header seconds if available. */
-    private static function parse_retry_after_header( $response ) {
-      $retry_after = wp_remote_retrieve_header( $response, 'retry-after' );
-      if ( is_array( $retry_after ) ) {
-        $retry_after = end( $retry_after );
-      }
-
-      if ( ! is_scalar( $retry_after ) ) {
-        return 0;
-      }
-
-      $retry_after = trim( (string) $retry_after );
-
-      return ctype_digit( $retry_after ) ? (int) $retry_after : 0;
+    /** Gemini returns 503 when a model is overloaded. */
+    protected static function is_overloaded( $http_code, array $body, $message ) {
+      return 503 === $http_code;
     }
   }
 }

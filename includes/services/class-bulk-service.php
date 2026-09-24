@@ -285,37 +285,61 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
      *
      * @param bool $regenerate_existing Whether to overwrite existing alt text.
      * @param int  $limit               Optional maximum number of attachments to process.
-     * @param bool $force_missing_only  Ignore $regenerate_existing and only process missing alt text.
+     * @param bool          $force_missing_only  Ignore $regenerate_existing and only process missing alt text.
+     * @param callable|null $on_item             Called with ( $attachment_id, $status, $message ) after each image.
      *
-     * @return array
+     * @return array{processed: int, updated: int, failed: int, halted: bool, halt_error: WP_Error|null}
      */
-    public function run_bulk_generation( $regenerate_existing, $limit = 0, $force_missing_only = false ) {
+    public function run_bulk_generation( $regenerate_existing, $limit = 0, $force_missing_only = false, $on_item = null ) {
       $attachment_ids = $this->get_attachment_ids( $regenerate_existing, $limit, $force_missing_only );
 
-      $processed = 0;
-      $updated   = 0;
-      $failed    = 0;
+      $processed  = 0;
+      $updated    = 0;
+      $failed     = 0;
+      $halt_error = null;
 
       foreach ( $attachment_ids as $attachment_id ) {
         $processed++;
         $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, $regenerate_existing );
+
         if ( is_wp_error( $result ) ) {
           $failed++;
+          $this->notify( $on_item, $attachment_id, 'failed', $result->get_error_message() );
+
           if ( $this->is_rate_limit_wp_error( $result ) ) {
+            $halt_error = $result;
             break;
           }
           continue;
         }
+
         if ( $result ) {
           $updated++;
+          $this->notify( $on_item, $attachment_id, 'updated', (string) get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+        } else {
+          $this->notify( $on_item, $attachment_id, 'skipped', '' );
         }
       }
 
       return [
-        'processed' => $processed,
-        'updated'   => $updated,
-        'failed'    => $failed,
+        'processed'  => $processed,
+        'updated'    => $updated,
+        'failed'     => $failed,
+        'halted'     => null !== $halt_error,
+        'halt_error' => $halt_error,
       ];
+    }
+
+    /**
+     * @param callable|null $callback      Progress callback.
+     * @param int           $attachment_id Attachment ID.
+     * @param string        $status        updated, skipped, or failed.
+     * @param string        $message       Alt text or error message.
+     */
+    protected function notify( $callback, $attachment_id, $status, $message ) {
+      if ( is_callable( $callback ) ) {
+        call_user_func( $callback, (int) $attachment_id, $status, $message );
+      }
     }
 
     /** Return a thumbnail URL (or fallback to the attachment URL). */

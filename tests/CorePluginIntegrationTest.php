@@ -44,7 +44,7 @@ class CorePluginIntegrationTest extends WP_UnitTestCase {
   public function test_core_hooks_are_registered() {
     $this->assertNotFalse( has_action( 'admin_enqueue_scripts', [ $this->plugin, 'enqueue_admin_assets' ] ) );
 
-    $this->assertNotFalse( has_action( 'admin_post_' . PWATG::AJAX_GENERATE_BULK, [ $this->plugin, 'handle_bulk_generation' ] ) );
+    $this->assertFalse( has_action( 'admin_post_' . PWATG::AJAX_GENERATE_BULK ), 'The single-request bulk fallback is gone; bulk runs in batches.' );
     $this->assertNotFalse( has_action( 'wp_ajax_' . PWATG::AJAX_INIT_BULK, [ $this->plugin, 'handle_bulk_init_ajax' ] ) );
     $this->assertNotFalse( has_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_BULK, [ $this->plugin, 'handle_bulk_generate_ajax' ] ) );
     $this->assertNotFalse( has_action( 'wp_ajax_' . PWATG::AJAX_SCAN_MISSING, [ $this->plugin, 'handle_bulk_scan_missing_ajax' ] ) );
@@ -81,7 +81,7 @@ class CorePluginIntegrationTest extends WP_UnitTestCase {
 
     $this->assertTrue( wp_style_is( PWATG::ASSET_HANDLE_ADMIN_CSS, 'enqueued' ) );
     $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_SETTINGS_JS, 'enqueued' ) );
-    $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
+    $this->assertFalse( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
 
     $data = wp_scripts()->get_data( PWATG::ASSET_HANDLE_SETTINGS_JS, 'data' );
     $this->assertIsString( $data );
@@ -94,14 +94,42 @@ class CorePluginIntegrationTest extends WP_UnitTestCase {
 
     $this->plugin->enqueue_admin_assets( PWATG::BULK_PAGE_SCREEN_ID );
 
-    $this->assertTrue( wp_style_is( PWATG::ASSET_HANDLE_ADMIN_CSS, 'enqueued' ) );
     $this->assertTrue( wp_style_is( PWATG::ASSET_HANDLE_BULK_CSS, 'enqueued' ) );
     $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_BULK_JS, 'enqueued' ) );
-    $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
+    $this->assertFalse( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
 
     $data = wp_scripts()->get_data( PWATG::ASSET_HANDLE_BULK_JS, 'data' );
     $this->assertIsString( $data );
     $this->assertStringContainsString( PWATG::JS_OBJECT_BULK, $data );
     $this->assertStringContainsString( PWATG::AJAX_INIT_BULK, $data );
+  }
+
+  public function test_media_assets_stay_off_unrelated_admin_screens() {
+    $this->plugin->enqueue_admin_assets( 'index.php' );
+
+    $this->assertFalse( wp_style_is( PWATG::ASSET_HANDLE_ADMIN_CSS, 'enqueued' ) );
+    $this->assertFalse( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
+  }
+
+  public function test_media_assets_load_on_the_media_library() {
+    $this->plugin->enqueue_admin_assets( 'upload.php' );
+
+    $this->assertTrue( wp_style_is( PWATG::ASSET_HANDLE_ADMIN_CSS, 'enqueued' ) );
+    $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
+  }
+
+  public function test_media_assets_load_wherever_the_media_modal_does() {
+    do_action( 'wp_enqueue_media' );
+
+    $this->assertTrue( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
+    $this->assertStringContainsString( 'admin-ajax.php', (string) wp_scripts()->get_data( PWATG::ASSET_HANDLE_MEDIA_JS, 'data' ), 'ajaxurl is not defined outside wp-admin.' );
+  }
+
+  public function test_media_assets_need_upload_files() {
+    wp_set_current_user( self::factory()->user->create( [ 'role' => 'subscriber' ] ) );
+
+    do_action( 'wp_enqueue_media' );
+
+    $this->assertFalse( wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) );
   }
 }

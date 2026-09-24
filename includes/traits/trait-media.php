@@ -318,6 +318,7 @@ trait PWATG_Media_Trait {
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_SINGLE . $attachment_id, 'nonce' );
+    $this->require_post_request();
 
     $result = $this->generate_alt_text_for_attachment( $attachment_id, true );
     $status = 'error';
@@ -489,31 +490,5 @@ trait PWATG_Media_Trait {
         ) );
       }
     }
-
-    if ( '' === $page || PWATG::BULK_PAGE_SLUG !== $page ) {
-      return;
-    }
-
-    $notice = get_transient( PWATG::TRANSIENT_NOTICE_BULK );
-    if ( ! is_array( $notice ) ) {
-      return;
-    }
-
-    delete_transient( PWATG::TRANSIENT_NOTICE_BULK );
-
-    $message = sprintf(
-      /* translators: 1: processed count, 2: updated count, 3: failed count */
-      esc_html__( 'Bulk generation complete. Processed: %1$d &middot; Updated: %2$d &middot; Failed: %3$d', 'presswell-alt-text-generator' ),
-      intval( $notice['processed'] ),
-      intval( $notice['updated'] ),
-      intval( $notice['failed'] )
-    );
-    echo wp_kses_post( $this->render_view_to_string(
-      'admin-notice.php',
-      [
-        'class' => 'notice notice-info is-dismissible',
-        'text'  => $message,
-      ]
-    ) );
   }
 }

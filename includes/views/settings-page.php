@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Local template variable from extracted view context.
 $active_tab = isset( $active_tab ) && 'debug' === $active_tab ? 'debug' : 'settings';
 ?>
-<div class="wrap">
+<div class="wrap pwatg-settings">
   <h1><?php echo esc_html__( 'Alt Text Generator', 'presswell-alt-text-generator' ); ?></h1>
 
   <nav class="nav-tab-wrapper">

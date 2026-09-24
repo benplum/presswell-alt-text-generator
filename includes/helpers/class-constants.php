@@ -37,10 +37,8 @@ class PWATG {
   const JS_OBJECT_MEDIA = 'pwatgMediaData';
   
   // Transient notices
-  const TRANSIENT_NOTICE_BULK = 'pwatg_bulk_notice';
   const TRANSIENT_NOTICE_TEST_PROVIDER = 'pwatg_test_provider_notice';
   const TRANSIENT_NOTICE_TTL = 60;
-  const NOTICE_KEY_BULK = self::TRANSIENT_NOTICE_BULK;
   const NOTICE_KEY_TEST_PROVIDER = self::TRANSIENT_NOTICE_TEST_PROVIDER;
 
   // Nonces

@@ -28,6 +28,9 @@ trait PWATG_Assets_Trait {
   /** Hook asset loaders into WordPress. */
   protected function construct_assets_trait() {
     add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+    // Wherever the media modal loads (block editor, Customizer, page builders), the
+    // Generate button shows in the attachment details.
+    add_action( 'wp_enqueue_media', [ $this, 'enqueue_media_assets' ] );
   }
 
   /**
@@ -40,14 +43,12 @@ trait PWATG_Assets_Trait {
       return;
     }
 
-    $should_enqueue_admin_css = $this->is_settings_page( $hook_suffix ) || current_user_can( 'upload_files' );
-    if ( $should_enqueue_admin_css ) {
-      wp_enqueue_style(
-        PWATG::ASSET_HANDLE_ADMIN_CSS,
-        $this->get_asset_url( 'css/admin.css' ),
-        [],
-        PWATG::VERSION
-      );
+    if ( $this->is_settings_page( $hook_suffix ) ) {
+      $this->enqueue_admin_style();
+    }
+
+    if ( 'upload.php' === $hook_suffix || $this->is_attachment_edit_screen( $hook_suffix ) ) {
+      $this->enqueue_media_assets();
     }
 
     if ( $this->is_settings_page( $hook_suffix ) && 'debug' === sanitize_key( $this->get_query_param( 'tab' ) ) ) {
@@ -171,51 +172,90 @@ trait PWATG_Assets_Trait {
       );
     }
 
-    if ( current_user_can( 'upload_files' ) ) {
-      $current_post_param = filter_input( INPUT_GET, 'post', FILTER_UNSAFE_RAW );
-      $current_post_id    = is_scalar( $current_post_param ) ? absint( (string) $current_post_param ) : 0;
-      $inline_url      = '';
-      $inline_last     = '';
-      $inline_has_alt  = false;
+  }
 
-      if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
-        $inline_url     = $this->get_single_action_url( $current_post_id );
-        $inline_last    = $this->get_last_generated_label( $current_post_id );
-        $inline_current = (string) get_post_meta( $current_post_id, PWATG::META_KEY_ALT_TEXT, true );
-        $inline_has_alt = '' !== trim( $inline_current );
-      }
+  /** Load the shared admin stylesheet once. */
+  protected function enqueue_admin_style() {
+    wp_enqueue_style(
+      PWATG::ASSET_HANDLE_ADMIN_CSS,
+      $this->get_asset_url( 'css/admin.css' ),
+      [],
+      PWATG::VERSION
+    );
+  }
 
-      wp_enqueue_script(
-        PWATG::ASSET_HANDLE_MEDIA_JS,
-        $this->get_asset_url( 'js/media.js' ),
-        [ 'jquery' ],
-        PWATG::VERSION,
-        true
-      );
-
-      wp_localize_script(
-        PWATG::ASSET_HANDLE_MEDIA_JS,
-        PWATG::JS_OBJECT_MEDIA,
-        [
-          'inlineUrl'  => $inline_url,
-          'inlineLast' => $inline_last,
-          'inlineHasAlt' => $inline_has_alt,
-          'ajaxAction' => PWATG::AJAX_GENERATE_SINGLE,
-            'fieldName' => PWATG::FIELD_GENERATE_SINGLE,
-          'strings'    => [
-            'generateButton'    => __( 'Generate Alt Text', 'presswell-alt-text-generator' ),
-            'generatingButton'  => __( 'Generating...', 'presswell-alt-text-generator' ),
-            'regenerateButton'  => __( 'Regenerate Alt Text', 'presswell-alt-text-generator' ),
-            'lastGeneratedLabel'=> __( 'Last generated:', 'presswell-alt-text-generator' ),
-            'never'             => __( 'Never', 'presswell-alt-text-generator' ),
-            'updated'           => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
-            'skipped'           => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
-            'missing_key'       => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
-            'error'             => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
-          ],
-        ]
-      );
+  /**
+   * Load the Media Library and media modal UI for users who can manage media.
+   */
+  public function enqueue_media_assets() {
+    if ( ! current_user_can( 'upload_files' ) || wp_script_is( PWATG::ASSET_HANDLE_MEDIA_JS, 'enqueued' ) ) {
+      return;
     }
+
+    $this->enqueue_admin_style();
+
+    $current_post_param = filter_input( INPUT_GET, 'post', FILTER_UNSAFE_RAW );
+    $current_post_id    = is_scalar( $current_post_param ) ? absint( (string) $current_post_param ) : 0;
+    $inline_url         = '';
+    $inline_last        = '';
+    $inline_has_alt     = false;
+
+    if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
+      $inline_url     = $this->get_single_action_url( $current_post_id );
+      $inline_last    = $this->get_last_generated_label( $current_post_id );
+      $inline_current = (string) get_post_meta( $current_post_id, PWATG::META_KEY_ALT_TEXT, true );
+      $inline_has_alt = '' !== trim( $inline_current );
+    }
+
+    wp_enqueue_script(
+      PWATG::ASSET_HANDLE_MEDIA_JS,
+      $this->get_asset_url( 'js/media.js' ),
+      [ 'jquery' ],
+      PWATG::VERSION,
+      true
+    );
+
+    wp_localize_script(
+      PWATG::ASSET_HANDLE_MEDIA_JS,
+      PWATG::JS_OBJECT_MEDIA,
+      [
+        // ajaxurl isn't defined when the media modal loads outside wp-admin.
+        'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+        'inlineUrl'    => $inline_url,
+        'inlineLast'   => $inline_last,
+        'inlineHasAlt' => $inline_has_alt,
+        'ajaxAction'   => PWATG::AJAX_GENERATE_SINGLE,
+        'fieldName'    => PWATG::FIELD_GENERATE_SINGLE,
+        'strings'      => [
+          'generateButton'     => __( 'Generate Alt Text', 'presswell-alt-text-generator' ),
+          'generatingButton'   => __( 'Generating...', 'presswell-alt-text-generator' ),
+          'regenerateButton'   => __( 'Regenerate Alt Text', 'presswell-alt-text-generator' ),
+          'lastGeneratedLabel' => __( 'Last generated:', 'presswell-alt-text-generator' ),
+          'never'              => __( 'Never', 'presswell-alt-text-generator' ),
+          'updated'            => __( 'Alt text generated successfully.', 'presswell-alt-text-generator' ),
+          'skipped'            => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
+          'missing_key'        => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
+          'error'              => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
+        ],
+      ]
+    );
+  }
+
+  /**
+   * Whether this is the edit screen for an attachment.
+   *
+   * @param string $hook_suffix Admin hook.
+   *
+   * @return bool
+   */
+  private function is_attachment_edit_screen( $hook_suffix ) {
+    if ( 'post.php' !== $hook_suffix ) {
+      return false;
+    }
+
+    $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+    return $screen && 'attachment' === $screen->post_type;
   }
 
   /**

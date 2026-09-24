@@ -14,9 +14,11 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     PWATG_Test_Provider::reset();
     add_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     $this->_setRole( 'administrator' );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
   }
 
   protected function tearDown(): void {
+    unset( $_SERVER['REQUEST_METHOD'] );
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
     parent::tearDown();
@@ -142,6 +144,21 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $this->assertSame( 0, $response['data']['failed'] );
     $this->assertSame( $attachment_id, $response['data']['next_cursor'] );
     $this->assertSame( 'Batch alt text', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  public function test_bulk_generate_ajax_rejects_get_requests() {
+    $this->create_image_attachment();
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'cursor'     => 0,
+      'batch_size' => 1,
+    ];
+
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertNull( PWATG_Test_Provider::$last_request );
   }
 
   public function test_bulk_cursor_pages_through_every_image_newest_first() {

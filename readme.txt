@@ -39,6 +39,8 @@ The Bulk page counts images missing alt text, allows regeneration preferences, a
 * `pwatg_provider_registry` — Map provider slugs to custom service classes
 * `pwatg_generate_on_upload` — Return false to skip generating alt text for a new upload (receives the attachment ID)
 * `pwatg_debug_log_max_bytes` — Size at which the debug log rotates (default 5 MB)
+* `pwatg_image_max_dimension` — Long edge, in pixels, of the image copy sent to the provider (default 1024)
+* `pwatg_alt_text_language` — Language the alt text is written in (defaults to the site language; return an empty string to leave it to the model)
 
 **WP-CLI**
 
@@ -52,10 +54,11 @@ If WP-CLI is available, you can run single-image generation, bulk generation, an
 Optional CLI flags:
 
 * `wp pwatg generate <attachment-id> --force`
-* `wp pwatg bulk-generate --force`
+* `wp pwatg bulk-generate --force` — reports how many images would be overwritten; add `--dry-run=false` to generate
+* `wp pwatg bulk-generate --dry-run`
 * `wp pwatg bulk-generate --limit=<int>`
 * `wp pwatg bulk-generate --missing-only`
-* `wp pwatg network-bulk-generate --force`
+* `wp pwatg network-bulk-generate --force` — a dry run unless `--dry-run=false` is given
 * `wp pwatg network-bulk-generate --limit=<int>`
 * `wp pwatg network-bulk-generate --missing-only`
 * `wp pwatg network-bulk-generate --sites=<id,id,...>`

@@ -14,9 +14,11 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     PWATG_Test_Provider::$response = 'Inline alt text stub.';
     add_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     $this->_setRole( 'administrator' );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
   }
 
   protected function tearDown(): void {
+    unset( $_SERVER['REQUEST_METHOD'] );
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     parent::tearDown();
   }
@@ -51,6 +53,29 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $this->assertSame( 'Inline alt text stub.', $response['data']['alt_text'] );
     $this->assertSame( 'Inline alt text stub.', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
     $this->assertNotEmpty( $response['data']['last_generated'] );
+  }
+
+  public function test_ajax_handler_rejects_get_requests() {
+    $attachment_id = $this->create_image_attachment();
+    delete_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT );
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_POST = [
+      'attachment_id' => $attachment_id,
+      'nonce'         => wp_create_nonce( PWATG::NONCE_GENERATE_SINGLE . $attachment_id ),
+    ];
+
+    try {
+      $this->_handleAjax( PWATG::AJAX_GENERATE_SINGLE );
+    } catch ( WPAjaxDieContinueException $e ) {
+      // Expected WordPress ajax termination.
+    } catch ( WPAjaxDieStopException $e ) {
+      // Expected WordPress ajax termination.
+    }
+
+    $response = json_decode( $this->_last_response, true );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertNull( PWATG_Test_Provider::$last_request );
   }
 
   public function test_ajax_handler_reports_missing_api_key_error() {

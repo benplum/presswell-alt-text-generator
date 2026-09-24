@@ -21,11 +21,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/includes/helpers/class-constants.php';
 require_once __DIR__ . '/includes/traits/trait-assets.php';
 require_once __DIR__ . '/includes/traits/trait-bulk.php';
+require_once __DIR__ . '/includes/traits/trait-cli.php';
 require_once __DIR__ . '/includes/traits/trait-helpers.php';
 require_once __DIR__ . '/includes/traits/trait-media.php';
 require_once __DIR__ . '/includes/traits/trait-pages.php';
 require_once __DIR__ . '/includes/traits/trait-providers.php';
 require_once __DIR__ . '/includes/traits/trait-settings.php';
+require_once __DIR__ . '/includes/services/class-provider-service.php';
 require_once __DIR__ . '/includes/services/class-openai-service.php';
 require_once __DIR__ . '/includes/services/class-anthropic-service.php';
 require_once __DIR__ . '/includes/services/class-gemini-service.php';
@@ -40,6 +42,7 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
   class Presswell_Alt_Text_Generator {
     use PWATG_Assets_Trait;
     use PWATG_Bulk_Trait;
+    use PWATG_CLI_Trait;
     use PWATG_Helpers_Trait;
     use PWATG_Media_Trait;
     use PWATG_Pages_Trait;

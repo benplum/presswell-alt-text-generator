@@ -169,13 +169,25 @@ trait PWATG_Settings_Trait {
       $sanitized['prompt_seed'] = $defaults['prompt_seed'];
     }
 
+    // Key fields render empty so saved keys never reach the page source; a blank
+    // field keeps the saved key, and the Remove checkbox clears it.
+    $stored          = $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
+    $stored_api_keys = is_array( $stored ) && isset( $stored['api_keys'] ) && is_array( $stored['api_keys'] ) ? $stored['api_keys'] : [];
+    $raw_api_keys    = isset( $input['api_keys'] ) && is_array( $input['api_keys'] ) ? $input['api_keys'] : [];
+    $remove_api_keys = isset( $input['api_keys_remove'] ) && is_array( $input['api_keys_remove'] ) ? $input['api_keys_remove'] : [];
+
     $sanitized['api_keys'] = $defaults['api_keys'];
-    $raw_api_keys          = isset( $input['api_keys'] ) && is_array( $input['api_keys'] ) ? $input['api_keys'] : [];
     foreach ( array_keys( $defaults['api_keys'] ) as $service_key ) {
-      if ( isset( $raw_api_keys[ $service_key ] ) ) {
-        $sanitized['api_keys'][ $service_key ] = is_scalar( $raw_api_keys[ $service_key ] )
-          ? trim( (string) wp_unslash( $raw_api_keys[ $service_key ] ) )
-          : '';
+      $submitted = isset( $raw_api_keys[ $service_key ] ) && is_scalar( $raw_api_keys[ $service_key ] )
+        ? trim( (string) wp_unslash( $raw_api_keys[ $service_key ] ) )
+        : '';
+
+      if ( ! empty( $remove_api_keys[ $service_key ] ) ) {
+        $sanitized['api_keys'][ $service_key ] = '';
+      } elseif ( '' !== $submitted ) {
+        $sanitized['api_keys'][ $service_key ] = $submitted;
+      } elseif ( isset( $stored_api_keys[ $service_key ] ) && is_scalar( $stored_api_keys[ $service_key ] ) ) {
+        $sanitized['api_keys'][ $service_key ] = trim( (string) $stored_api_keys[ $service_key ] );
       }
     }
 
@@ -619,28 +631,39 @@ trait PWATG_Settings_Trait {
     <div class="pwatg-plugin-api-key-group">
       <?php foreach ( $services as $service => $label ) : ?>
         <?php
-        $service = sanitize_key( $service );
-        $value   = isset( $settings['api_keys'][ $service ] ) ? (string) $settings['api_keys'][ $service ] : '';
+        $service   = sanitize_key( $service );
+        $saved_key = isset( $settings['api_keys'][ $service ] ) ? (string) $settings['api_keys'][ $service ] : '';
+        $field_id  = 'pwatg-api-key-' . $service;
         ?>
         <div class="pwatg-api-key-wrap <?php echo $current === $service ? '' : 'is-hidden'; ?>" data-service="<?php echo esc_attr( $service ); ?>">
           <input
             type="password"
+            id="<?php echo esc_attr( $field_id ); ?>"
             name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[api_keys][<?php echo esc_attr( $service ); ?>]"
-            value="<?php echo esc_attr( $value ); ?>"
+            value=""
             class="regular-text"
-            autocomplete="off"
+            autocomplete="new-password"
+            <?php if ( '' !== $saved_key ) : ?>
+              placeholder="<?php echo esc_attr( sprintf( /* translators: %s: last four characters of the saved key */ __( 'Saved key ending in %s', 'presswell-alt-text-generator' ), substr( $saved_key, -4 ) ) ); ?>"
+            <?php endif; ?>
           />
           <p class="description">
             <?php
             echo esc_html(
-              sprintf(
+              '' !== $saved_key
                 /* translators: %s: AI service name */
-                  __( 'API key for %s.', 'presswell-alt-text-generator' ),
-                $label
-              )
+                ? sprintf( __( 'A key for %s is saved. Leave this blank to keep it, or enter a new key to replace it.', 'presswell-alt-text-generator' ), $label )
+                /* translators: %s: AI service name */
+                : sprintf( __( 'API key for %s.', 'presswell-alt-text-generator' ), $label )
             );
             ?>
           </p>
+          <?php if ( '' !== $saved_key ) : ?>
+            <label>
+              <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[api_keys_remove][<?php echo esc_attr( $service ); ?>]" value="1" />
+              <?php echo esc_html__( 'Remove saved key', 'presswell-alt-text-generator' ); ?>
+            </label>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
@@ -711,7 +734,7 @@ trait PWATG_Settings_Trait {
       <a href="<?php echo esc_url( $debug_log_url ); ?>"><?php echo esc_html__( 'View logs', 'presswell-alt-text-generator' ); ?></a>
       <?php endif; ?>
     </label>
-    <p class="description"><?php echo esc_html__( 'Turns off automatically after 7 days. Logs are kept private and viewed from the Debug tab.', 'presswell-alt-text-generator' ); ?></p>
+    <!-- <p class="description"><?php echo esc_html__( 'Turns off automatically after 7 days. Logs are kept private and viewed from the Debug tab.', 'presswell-alt-text-generator' ); ?></p> -->
     <?php
   }
 
@@ -849,6 +872,11 @@ trait PWATG_Settings_Trait {
         }
         $api_key = $this->get_api_key_for_core_connector( $core_connector );
       }
+    }
+
+    // The key field is blank when a key is already saved, so test with the saved one.
+    if ( '' === $api_key && '' !== $service ) {
+      $api_key = $this->resolve_service_api_key( $service, $settings );
     }
 
     $this->debug_log(

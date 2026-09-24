@@ -19,6 +19,7 @@ if ( ! class_exists( 'PWATG_Test_Provider' ) ) {
     }
 
     public static function request_text( $api_key, $model, $prompt ) {
+      self::$last_request = compact( 'api_key', 'model', 'prompt' );
       return 'OK';
     }
   }

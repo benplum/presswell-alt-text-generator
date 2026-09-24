@@ -112,9 +112,9 @@ class ProvidersTest extends WP_UnitTestCase {
   }
 
   public function test_gemini_request_alt_text_combines_text_parts() {
-    $model      = 'gemini-1.5-flash';
+    $model      = 'gemini-2.5-flash';
     $api_key    = 'gm-key';
-    $expected_url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $api_key );
+    $expected_url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent';
 
     $this->mock_http_response(
       $expected_url,
@@ -142,26 +142,61 @@ class ProvidersTest extends WP_UnitTestCase {
     $inline_data = $payload['contents'][0]['parts'][1]['inlineData'] ?? [];
     $this->assertSame( 'image/jpeg', $inline_data['mimeType'] );
     $this->assertSame( base64_encode( 'binary-data' ), $inline_data['data'] );
+    $this->assertSame( $api_key, $this->captured_request['headers']['x-goog-api-key'], 'The key is sent as a header, not in the URL.' );
   }
 
-  public function test_gemini_request_text_maps_quota_errors() {
-    $model   = 'gemini-2.0-flash';
-    $api_key = 'gm-key';
-    $url     = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $api_key );
+  /**
+   * @dataProvider provider_error_responses
+   */
+  public function test_provider_errors_map_to_the_right_pause( $service, $status, $body, $expected_code, $expected_retry ) {
+    $urls = [
+      'openai'    => 'https://api.openai.com/v1/chat/completions',
+      'anthropic' => 'https://api.anthropic.com/v1/messages',
+      'gemini'    => 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    ];
+    $classes = [
+      'openai'    => 'PWATG_OpenAI_Service',
+      'anthropic' => 'PWATG_Anthropic_Service',
+      'gemini'    => 'PWATG_Gemini_Service',
+    ];
 
-    $this->mock_http_response(
-      $url,
-      $this->build_http_response(
-        403,
-        [ 'error' => [ 'message' => 'Quota exceeded' ] ]
-      )
-    );
+    $this->mock_http_response( $urls[ $service ], $this->build_http_response( $status, $body ) );
 
-    $result = PWATG_Gemini_Service::request_text( $api_key, $model, 'Say hello' );
+    $result = call_user_func( [ $classes[ $service ], 'request_text' ], 'key', 'gemini' === $service ? 'gemini-2.5-flash' : 'model', 'Prompt' );
+
     $this->assertInstanceOf( WP_Error::class, $result );
-    $this->assertSame( 'pwatg_quota_exceeded', $result->get_error_code() );
+    $this->assertSame( $expected_code, $result->get_error_code() );
     $data = $result->get_error_data();
-    $this->assertSame( 'gemini', $data['provider'] );
+    $this->assertSame( $service, $data['provider'] );
+    $this->assertSame( $expected_retry, isset( $data['retry_after'] ) ? $data['retry_after'] : null );
+  }
+
+  public function provider_error_responses() {
+    return [
+      'openai rate limit'             => [ 'openai', 429, [ 'error' => [ 'message' => 'Rate limit reached', 'code' => 'rate_limit_exceeded' ] ], 'pwatg_rate_limited', null ],
+      'openai out of credit'          => [ 'openai', 429, [ 'error' => [ 'message' => 'You exceeded your current quota', 'code' => 'insufficient_quota' ] ], 'pwatg_quota_exceeded', null ],
+      'openai bad key'                => [ 'openai', 401, [ 'error' => [ 'message' => 'Incorrect API key' ] ], 'pwatg_api_error', null ],
+      'openai forbidden region'       => [ 'openai', 403, [ 'error' => [ 'message' => 'Country not supported' ] ], 'pwatg_api_error', null ],
+      'anthropic out of credit'       => [ 'anthropic', 400, [ 'error' => [ 'type' => 'invalid_request_error', 'message' => 'Your credit balance is too low to access the Anthropic API.' ] ], 'pwatg_quota_exceeded', null ],
+      'anthropic overloaded'          => [ 'anthropic', 529, [ 'error' => [ 'type' => 'overloaded_error', 'message' => 'Overloaded' ] ], 'pwatg_rate_limited', 60 ],
+      'anthropic permission'          => [ 'anthropic', 403, [ 'error' => [ 'type' => 'permission_error', 'message' => 'Not allowed' ] ], 'pwatg_api_error', null ],
+      'anthropic unknown model'       => [ 'anthropic', 404, [ 'error' => [ 'type' => 'not_found_error', 'message' => 'model: claude-3-opus' ] ], 'pwatg_api_error', null ],
+      'gemini rate limit'             => [ 'gemini', 429, [ 'error' => [ 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'Resource has been exhausted (e.g. check rate limits).' ] ], 'pwatg_rate_limited', null ],
+      'gemini quota'                  => [ 'gemini', 429, [ 'error' => [ 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'You exceeded your current quota, please check your plan.' ] ], 'pwatg_quota_exceeded', null ],
+      'gemini overloaded'             => [ 'gemini', 503, [ 'error' => [ 'status' => 'UNAVAILABLE', 'message' => 'The model is overloaded.' ] ], 'pwatg_rate_limited', 60 ],
+      'gemini permission'             => [ 'gemini', 403, [ 'error' => [ 'status' => 'PERMISSION_DENIED', 'message' => 'API key not valid.' ] ], 'pwatg_api_error', null ],
+      'payment required'              => [ 'openai', 402, [ 'error' => [ 'message' => 'Payment required' ] ], 'pwatg_quota_exceeded', null ],
+    ];
+  }
+
+  public function test_a_permission_error_does_not_pause_generation() {
+    $plugin = presswell_alt_text_generator();
+    $lock   = new ReflectionMethod( $plugin, 'maybe_start_rate_limit_lock' );
+    $lock->setAccessible( true );
+
+    $lock->invoke( $plugin, new WP_Error( 'pwatg_api_error', 'Not allowed', [ 'http_code' => 403, 'provider' => 'anthropic' ] ) );
+
+    $this->assertFalse( get_transient( PWATG::RATE_LIMIT_TRANSIENT ) );
   }
 
   /**
