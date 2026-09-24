@@ -59,7 +59,13 @@ trait PWATG_Bulk_Trait {
 
     $run_test            = ! empty( $_POST['run_test'] );
     $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
-    $total               = $this->get_bulk_service()->count_attachments( $regenerate_existing );
+
+    $run_id = $this->acquire_bulk_run( wp_get_current_user()->display_name );
+    if ( is_wp_error( $run_id ) ) {
+      wp_send_json_error( [ 'message' => $run_id->get_error_message(), 'code' => $run_id->get_error_code() ], 409 );
+    }
+
+    $total = $this->get_bulk_service()->count_attachments( $regenerate_existing );
 
     if ( $run_test ) {
       $total = min( 5, $total );
@@ -74,9 +80,14 @@ trait PWATG_Bulk_Trait {
       ]
     );
 
+    if ( 0 === $total ) {
+      $this->release_bulk_run( $run_id );
+    }
+
     wp_send_json_success(
       [
-        'total' => $total,
+        'total'  => $total,
+        'run_id' => $run_id,
       ]
     );
   }
@@ -99,6 +110,12 @@ trait PWATG_Bulk_Trait {
         ],
         429
       );
+    }
+
+    $run_id = isset( $_POST['run_id'] ) ? sanitize_text_field( wp_unslash( $_POST['run_id'] ) ) : '';
+    $alive  = $this->touch_bulk_run( $run_id );
+    if ( is_wp_error( $alive ) ) {
+      wp_send_json_error( [ 'message' => $alive->get_error_message(), 'code' => $alive->get_error_code() ], 409 );
     }
 
     $cursor              = isset( $_POST['cursor'] ) ? absint( wp_unslash( $_POST['cursor'] ) ) : 0;
@@ -127,6 +144,13 @@ trait PWATG_Bulk_Trait {
         'done'                => ! empty( $results['done'] ),
       ]
     );
+
+    // The browser stops once it has processed the total it was given, which can be
+    // before the server sees a short page.
+    $remaining = isset( $_POST['remaining'] ) ? absint( wp_unslash( $_POST['remaining'] ) ) : 0;
+    if ( ! empty( $results['done'] ) || ( $remaining > 0 && (int) $results['processed'] >= $remaining ) ) {
+      $this->release_bulk_run( $run_id );
+    }
 
     $payload = [
       'processed'   => $results['processed'],
@@ -177,6 +201,97 @@ trait PWATG_Bulk_Trait {
         'missing_alt_count'  => $this->get_missing_alt_count(),
       ]
     );
+  }
+
+  /**
+   * Claim the site's bulk run, so two admins (or a browser and WP-CLI) don't
+   * process and pay for the same images at once.
+   *
+   * A run that hasn't checked in for PWATG::BULK_RUN_STALE_SECONDS (a closed tab,
+   * a crashed process) can be taken over.
+   *
+   * @param string $owner Who is running it, for the message another admin sees.
+   *
+   * @return string|WP_Error Run ID, or an error naming the run in progress.
+   */
+  public function acquire_bulk_run( $owner ) {
+    $run = [
+      'id'        => wp_generate_password( 12, false, false ),
+      'owner'     => (string) $owner,
+      'heartbeat' => time(),
+    ];
+
+    // add_option() only succeeds when no run is stored, so two starts can't both win.
+    if ( add_option( PWATG::OPTION_BULK_RUN, $run, '', false ) ) {
+      return $run['id'];
+    }
+
+    $current = $this->get_bulk_run();
+    if ( $current && ! $this->is_bulk_run_stale( $current ) ) {
+      return new WP_Error(
+        'pwatg_bulk_run_active',
+        sprintf(
+          /* translators: %s: user name or "WP-CLI" */
+          __( 'Another bulk run is in progress (started by %s). Try again when it finishes.', 'presswell-alt-text-generator' ),
+          '' !== $current['owner'] ? $current['owner'] : __( 'another administrator', 'presswell-alt-text-generator' )
+        )
+      );
+    }
+
+    update_option( PWATG::OPTION_BULK_RUN, $run, false );
+
+    return $run['id'];
+  }
+
+  /**
+   * Confirm a run still holds the lock and record that it is alive.
+   *
+   * @param string $run_id Run ID from acquire_bulk_run().
+   *
+   * @return true|WP_Error
+   */
+  public function touch_bulk_run( $run_id ) {
+    $current = $this->get_bulk_run();
+
+    if ( ! $current || '' === (string) $run_id || ! hash_equals( $current['id'], (string) $run_id ) ) {
+      return new WP_Error( 'pwatg_bulk_run_replaced', __( 'This bulk run was stopped because another run started. Start again when it finishes.', 'presswell-alt-text-generator' ) );
+    }
+
+    $current['heartbeat'] = time();
+    update_option( PWATG::OPTION_BULK_RUN, $current, false );
+
+    return true;
+  }
+
+  /**
+   * Release the lock, if this run still holds it.
+   *
+   * @param string $run_id Run ID.
+   */
+  public function release_bulk_run( $run_id ) {
+    $current = $this->get_bulk_run();
+
+    if ( $current && hash_equals( $current['id'], (string) $run_id ) ) {
+      delete_option( PWATG::OPTION_BULK_RUN );
+    }
+  }
+
+  /** @return array|null Stored run. */
+  protected function get_bulk_run() {
+    // Read past the options cache: another request may have just changed it.
+    wp_cache_delete( PWATG::OPTION_BULK_RUN, 'options' );
+    $run = get_option( PWATG::OPTION_BULK_RUN );
+
+    return is_array( $run ) && ! empty( $run['id'] ) ? wp_parse_args( $run, [ 'owner' => '', 'heartbeat' => 0 ] ) : null;
+  }
+
+  /**
+   * @param array $run Stored run.
+   *
+   * @return bool
+   */
+  protected function is_bulk_run_stale( array $run ) {
+    return (int) $run['heartbeat'] < time() - PWATG::BULK_RUN_STALE_SECONDS;
   }
 
   /**

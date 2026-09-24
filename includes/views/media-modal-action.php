@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @var bool   $has_alt
  * @var string $button_label
  * @var string $last_generated
+ * @var bool   $has_previous
+ * @var string $restore_nonce
  */
 ?>
 <a href="<?php echo esc_url( $url ); ?>"
@@ -26,3 +28,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</strong> 
 	<?php echo esc_html( $last_generated ); ?>
 </p>
+<button type="button" class="button-link pwatg-restore-alt-action" data-attachment-id="<?php echo esc_attr( (int) $attachment_id ); ?>" data-nonce="<?php echo esc_attr( $restore_nonce ); ?>" <?php echo empty( $has_previous ) ? 'hidden' : ''; ?>>
+  <?php echo esc_html__( 'Restore previous alt text', 'presswell-alt-text-generator' ); ?>
+</button>

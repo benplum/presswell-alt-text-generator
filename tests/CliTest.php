@@ -25,7 +25,8 @@ class CliTest extends WP_UnitTestCase {
 
   protected function tearDown(): void {
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
-    delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
+    pwatg_test_delete_lock();
+    delete_option( PWATG::OPTION_BULK_RUN );
     parent::tearDown();
   }
 
@@ -101,13 +102,28 @@ class CliTest extends WP_UnitTestCase {
 
   public function test_an_active_limit_blocks_a_new_run() {
     $this->create_image();
-    set_transient( PWATG::RATE_LIMIT_TRANSIENT, [ 'code' => 'pwatg_rate_limited', 'provider' => 'openai', 'message' => 'Paused', 'until' => time() + 300 ], 300 );
+    pwatg_test_set_lock( [ 'code' => 'pwatg_rate_limited', 'provider' => 'openai', 'message' => 'Paused', 'until' => time() + 300 ], 300 );
 
     $result = $this->plugin->run_bulk_generate_cli();
 
     $this->assertFalse( $result['ok'] );
     $this->assertTrue( $result['halted'] );
     $this->assertNull( PWATG_Test_Provider::$last_request );
+  }
+
+  public function test_cli_waits_for_a_browser_run_and_releases_its_own() {
+    $this->create_image();
+    $browser_run = $this->plugin->acquire_bulk_run( 'Jamie' );
+
+    $blocked = $this->plugin->run_bulk_generate_cli();
+    $this->assertFalse( $blocked['ok'] );
+    $this->assertStringContainsString( 'started by Jamie', $blocked['error'] );
+    $this->assertNull( PWATG_Test_Provider::$last_request );
+
+    $this->plugin->release_bulk_run( $browser_run );
+
+    $this->assertTrue( $this->plugin->run_bulk_generate_cli()['ok'] );
+    $this->assertFalse( get_option( PWATG::OPTION_BULK_RUN ), 'The CLI run releases the lock when it ends.' );
   }
 
   public function test_generate_reports_skips_and_failures() {

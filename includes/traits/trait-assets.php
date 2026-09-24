@@ -127,7 +127,7 @@ trait PWATG_Assets_Trait {
       wp_enqueue_style(
         PWATG::ASSET_HANDLE_BULK_CSS,
         $this->get_asset_url( 'css/bulk.css' ),
-        [],
+        [ $this->register_common_style() ],
         PWATG::VERSION
       );
 
@@ -167,6 +167,18 @@ trait PWATG_Assets_Trait {
             'checkFailed'  => __( 'Could not refresh the count.', 'presswell-alt-text-generator' ),
             'countZero'    => __( 'No images without alt text were found.', 'presswell-alt-text-generator' ),
             'countUpdated' => __( 'Count updated.', 'presswell-alt-text-generator' ),
+            'pause'        => __( 'Pause', 'presswell-alt-text-generator' ),
+            'continue'     => __( 'Continue', 'presswell-alt-text-generator' ),
+            'leaveWarning' => __( 'Bulk generation is still running. Leaving this page will stop the process.', 'presswell-alt-text-generator' ),
+            'statusUpdated' => __( 'Updated', 'presswell-alt-text-generator' ),
+            'statusFailed'  => __( 'Failed', 'presswell-alt-text-generator' ),
+            'statusSkipped' => __( 'Skipped', 'presswell-alt-text-generator' ),
+            /* translators: 1: images processed, 2: images in the run, 3: updated, 4: failed */
+            'progress'      => __( 'Processed %1$s of %2$s · Updated: %3$s · Failed: %4$s', 'presswell-alt-text-generator' ),
+            /* translators: 1: images processed, 2: updated, 3: failed */
+            'summary'       => __( 'Processed: %1$s · Updated: %2$s · Failed: %3$s', 'presswell-alt-text-generator' ),
+            /* translators: %d: minutes */
+            'retryMinutes'  => __( 'retry in %d min', 'presswell-alt-text-generator' ),
           ],
         ]
       );
@@ -174,12 +186,28 @@ trait PWATG_Assets_Trait {
 
   }
 
+  /**
+   * Register the badge styles shared by every plugin screen.
+   *
+   * @return string Style handle.
+   */
+  protected function register_common_style() {
+    wp_register_style(
+      PWATG::ASSET_HANDLE_COMMON_CSS,
+      $this->get_asset_url( 'css/common.css' ),
+      [],
+      PWATG::VERSION
+    );
+
+    return PWATG::ASSET_HANDLE_COMMON_CSS;
+  }
+
   /** Load the shared admin stylesheet once. */
   protected function enqueue_admin_style() {
     wp_enqueue_style(
       PWATG::ASSET_HANDLE_ADMIN_CSS,
       $this->get_asset_url( 'css/admin.css' ),
-      [],
+      [ $this->register_common_style() ],
       PWATG::VERSION
     );
   }
@@ -199,12 +227,16 @@ trait PWATG_Assets_Trait {
     $inline_url         = '';
     $inline_last        = '';
     $inline_has_alt     = false;
+    $inline_previous    = false;
+    $inline_restore     = '';
 
     if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
       $inline_url     = $this->get_single_action_url( $current_post_id );
       $inline_last    = $this->get_last_generated_label( $current_post_id );
       $inline_current = (string) get_post_meta( $current_post_id, PWATG::META_KEY_ALT_TEXT, true );
       $inline_has_alt = '' !== trim( $inline_current );
+      $inline_previous = $this->has_previous_alt( $current_post_id );
+      $inline_restore  = wp_create_nonce( PWATG::NONCE_RESTORE_ALT . $current_post_id );
     }
 
     wp_enqueue_script(
@@ -224,7 +256,10 @@ trait PWATG_Assets_Trait {
         'inlineUrl'    => $inline_url,
         'inlineLast'   => $inline_last,
         'inlineHasAlt' => $inline_has_alt,
+        'inlineHasPrevious' => $inline_previous,
+        'inlineRestoreNonce' => $inline_restore,
         'ajaxAction'   => PWATG::AJAX_GENERATE_SINGLE,
+        'restoreAction' => PWATG::AJAX_RESTORE_ALT,
         'fieldName'    => PWATG::FIELD_GENERATE_SINGLE,
         'strings'      => [
           'generateButton'     => __( 'Generate Alt Text', 'presswell-alt-text-generator' ),
@@ -236,6 +271,8 @@ trait PWATG_Assets_Trait {
           'skipped'            => __( 'No changes were needed for this image.', 'presswell-alt-text-generator' ),
           'missing_key'        => __( 'Missing API key. Add it in Alt Text Generator settings or WordPress AI Connectors.', 'presswell-alt-text-generator' ),
           'error'              => __( 'Could not generate alt text for this image.', 'presswell-alt-text-generator' ),
+          'restoreButton'      => __( 'Restore previous alt text', 'presswell-alt-text-generator' ),
+          'restoreFailed'      => __( 'Could not restore the previous alt text.', 'presswell-alt-text-generator' ),
         ],
       ]
     );

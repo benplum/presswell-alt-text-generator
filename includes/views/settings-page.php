@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Admin Settings → Alt Text Generator markup.
  *
+ * @var bool   $is_subsite       Whether this is a non-main site in a network.
  * @var string $active_tab       'settings' or 'debug'.
  * @var string $settings_tab_url Settings tab URL.
  * @var string $debug_tab_url    Debug tab URL.
@@ -22,7 +23,12 @@ $active_tab = isset( $active_tab ) && 'debug' === $active_tab ? 'debug' : 'setti
     <a href="<?php echo esc_url( $debug_tab_url ); ?>" class="nav-tab <?php echo 'debug' === $active_tab ? 'nav-tab-active' : ''; ?>"><?php echo esc_html__( 'Debug', 'presswell-alt-text-generator' ); ?></a>
   </nav>
 
-  <?php if ( 'settings' === $active_tab ) : ?>
+  <?php if ( 'settings' === $active_tab && ! empty( $is_subsite ) ) : ?>
+    <?php // Saving here would write a copy of the main site's settings, including its API keys. ?>
+    <div class="notice notice-info inline">
+      <p><?php echo esc_html__( 'This site uses the settings from the main site of the network. Change them there.', 'presswell-alt-text-generator' ); ?></p>
+    </div>
+  <?php elseif ( 'settings' === $active_tab ) : ?>
     <form method="post" action="options.php">
       <?php
         settings_fields( 'pwatg_settings_group' );

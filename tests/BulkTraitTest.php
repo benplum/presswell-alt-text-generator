@@ -20,7 +20,8 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
   protected function tearDown(): void {
     unset( $_SERVER['REQUEST_METHOD'] );
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
-    delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
+    pwatg_test_delete_lock();
+    delete_option( PWATG::OPTION_BULK_RUN );
     parent::tearDown();
   }
 
@@ -48,8 +49,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
   }
 
   public function test_get_rate_limit_lock_state_clears_expired() {
-    set_transient(
-      PWATG::RATE_LIMIT_TRANSIENT,
+    pwatg_test_set_lock(
       [
         'code'     => 'pwatg_rate_limited',
         'provider' => 'openai',
@@ -61,7 +61,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
 
     $state = $this->invoke_protected_method( 'get_rate_limit_lock_state' );
     $this->assertNull( $state );
-    $this->assertFalse( get_transient( PWATG::RATE_LIMIT_TRANSIENT ) );
+    $this->assertFalse( pwatg_test_get_lock() );
   }
 
   public function test_bulk_init_ajax_returns_the_total_without_an_id_list() {
@@ -129,6 +129,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $attachment_id = $this->create_image_attachment();
     $_POST = [
       'nonce'              => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'             => $this->plugin->acquire_bulk_run( 'Test' ),
       'cursor'             => 0,
       'batch_size'         => 1,
       'regenerate_existing'=> 0,
@@ -159,6 +160,87 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
 
     $this->assertFalse( $response['success'] );
     $this->assertNull( PWATG_Test_Provider::$last_request );
+  }
+
+  public function test_a_limit_from_another_provider_does_not_block_generation() {
+    $attachment_id = $this->create_image_attachment();
+    $this->invoke_protected_method( 'maybe_start_rate_limit_lock', [ new WP_Error( 'pwatg_rate_limited', 'Wait', [ 'provider' => 'anthropic' ] ) ] );
+
+    $this->assertTrue( $this->plugin->generate_alt_text_for_attachment( $attachment_id, true ), 'The site now uses OpenAI.' );
+
+    $this->invoke_protected_method( 'maybe_start_rate_limit_lock', [ new WP_Error( 'pwatg_rate_limited', 'Wait', [ 'provider' => 'openai' ] ) ] );
+
+    $this->assertInstanceOf( WP_Error::class, $this->plugin->generate_alt_text_for_attachment( $attachment_id, true ) );
+  }
+
+  public function test_bulk_runs_include_avif_images() {
+    $this->assertContains( 'image/avif', PWATG::BULK_MIME_TYPES, 'AVIF is converted to JPEG before sending.' );
+
+    $attachment_id = self::factory()->attachment->create_object( 'bulk.avif', 0, [ 'post_mime_type' => 'image/avif', 'post_status' => 'inherit' ] );
+    $service       = new PWATG_Bulk_Service( $this->plugin );
+
+    $this->assertContains( $attachment_id, $service->get_attachment_ids( false ) );
+  }
+
+  public function test_a_second_bulk_run_is_refused_while_one_is_active() {
+    $this->create_image_attachment();
+    $_POST = [ 'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ) ];
+
+    $first = $this->ajax( PWATG::AJAX_INIT_BULK );
+    $this->assertTrue( $first['success'] );
+    $this->assertNotEmpty( $first['data']['run_id'] );
+
+    $_POST  = [ 'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ) ];
+    $second = $this->ajax( PWATG::AJAX_INIT_BULK );
+
+    $this->assertFalse( $second['success'] );
+    $this->assertSame( 'pwatg_bulk_run_active', $second['data']['code'] );
+    $this->assertStringContainsString( 'Another bulk run is in progress', $second['data']['message'] );
+  }
+
+  public function test_batches_need_the_run_that_holds_the_lock() {
+    $this->create_image_attachment();
+    $this->plugin->acquire_bulk_run( 'Someone else' );
+
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'     => 'not-the-run',
+      'cursor'     => 0,
+      'batch_size' => 1,
+    ];
+
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertSame( 'pwatg_bulk_run_replaced', $response['data']['code'] );
+    $this->assertNull( PWATG_Test_Provider::$last_request, 'Nothing is sent to the provider.' );
+  }
+
+  public function test_a_stale_run_can_be_taken_over() {
+    $this->plugin->acquire_bulk_run( 'Closed tab' );
+    $run              = get_option( PWATG::OPTION_BULK_RUN );
+    $run['heartbeat'] = time() - PWATG::BULK_RUN_STALE_SECONDS - 5;
+    update_option( PWATG::OPTION_BULK_RUN, $run );
+
+    $this->assertIsString( $this->plugin->acquire_bulk_run( 'New admin' ) );
+    $this->assertInstanceOf( WP_Error::class, $this->plugin->touch_bulk_run( $run['id'] ), 'The old run stops when it resumes.' );
+  }
+
+  public function test_the_last_batch_releases_the_lock() {
+    $this->create_image_attachment();
+    $this->create_image_attachment();
+    $run_id = $this->plugin->acquire_bulk_run( 'Test' );
+
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'     => $run_id,
+      'cursor'     => 0,
+      'batch_size' => 2,
+      'remaining'  => 2,
+    ];
+
+    $this->assertTrue( $this->ajax( PWATG::AJAX_GENERATE_BULK )['success'] );
+    $this->assertFalse( get_option( PWATG::OPTION_BULK_RUN ), 'Another admin can start straight away.' );
   }
 
   public function test_bulk_cursor_pages_through_every_image_newest_first() {
@@ -192,6 +274,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
 
     $_POST = [
       'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'     => $this->plugin->acquire_bulk_run( 'Test' ),
       'cursor'     => 0,
       'batch_size' => 5,
     ];

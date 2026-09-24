@@ -31,9 +31,10 @@ trait PWATG_Settings_Trait {
       ]
     );
 
+    // Untitled: the Settings tab already names the section.
     add_settings_section(
       'pwatg_main_section',
-      __( 'Settings', 'presswell-alt-text-generator' ),
+      '',
       '__return_false',
       PWATG::SETTINGS_PAGE_SLUG
     );
@@ -49,7 +50,7 @@ trait PWATG_Settings_Trait {
 
       add_settings_field(
         'core_connector',
-        __( 'AI Service', 'presswell-alt-text-generator' ),
+        __( 'AI Connector', 'presswell-alt-text-generator' ),
         [ $this, 'render_core_connector_field' ],
         PWATG::SETTINGS_PAGE_SLUG,
         'pwatg_main_section'
@@ -103,6 +104,14 @@ trait PWATG_Settings_Trait {
       PWATG::SETTINGS_PAGE_SLUG,
       'pwatg_main_section'
     );
+
+    add_settings_field(
+      'remove_data_on_uninstall',
+      __( 'Remove Data', 'presswell-alt-text-generator' ),
+      [ $this, 'render_remove_data_field' ],
+      PWATG::SETTINGS_PAGE_SLUG,
+      'pwatg_main_section'
+    );
   }
 
   /**
@@ -123,6 +132,7 @@ trait PWATG_Settings_Trait {
       'auto_generate' => ! empty( $input['auto_generate'] ) ? 'on' : '',
       // Saved values are 'on' or 'off', so a non-empty check would read 'off' as on.
       'debug_logging' => ( isset( $input['debug_logging'] ) && 'on' === $input['debug_logging'] ) ? 'on' : 'off',
+      'remove_data_on_uninstall' => ( isset( $input['remove_data_on_uninstall'] ) && 'on' === $input['remove_data_on_uninstall'] ) ? 'on' : '',
       'connector_source' => isset( $input['connector_source'] ) ? sanitize_key( $input['connector_source'] ) : $defaults['connector_source'],
       'core_connector'   => isset( $input['core_connector'] ) ? sanitize_key( $input['core_connector'] ) : $defaults['core_connector'],
     ];
@@ -171,7 +181,7 @@ trait PWATG_Settings_Trait {
 
     // Key fields render empty so saved keys never reach the page source; a blank
     // field keeps the saved key, and the Remove checkbox clears it.
-    $stored          = $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
+    $stored          = ( is_multisite() && ! is_main_site() ) ? get_option( PWATG::SETTINGS_KEY, [] ) : $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
     $stored_api_keys = is_array( $stored ) && isset( $stored['api_keys'] ) && is_array( $stored['api_keys'] ) ? $stored['api_keys'] : [];
     $raw_api_keys    = isset( $input['api_keys'] ) && is_array( $input['api_keys'] ) ? $input['api_keys'] : [];
     $remove_api_keys = isset( $input['api_keys_remove'] ) && is_array( $input['api_keys_remove'] ) ? $input['api_keys_remove'] : [];
@@ -308,6 +318,7 @@ trait PWATG_Settings_Trait {
       'core_connector'   => '',
       'auto_generate' => 'on',
       'debug_logging' => 'off',
+      'remove_data_on_uninstall' => '',
     ];
   }
 
@@ -380,7 +391,7 @@ trait PWATG_Settings_Trait {
       $choices[ $connector_id ] = [
         'label'   => $name,
         'service' => $service,
-        'has_key' => '' !== $this->get_api_key_for_core_connector( $connector_id ),
+        'has_key' => '' !== $this->get_api_key_for_core_connector( $connector_id ) || PWATG_WP_AI_Client_Service::is_provider_ready( $connector_id ),
       ];
     }
 
@@ -516,6 +527,13 @@ trait PWATG_Settings_Trait {
         <?php endforeach; ?>
       </select>
       <p class="description pwatg-core-connector-message">
+        <?php
+        if ( PWATG_WP_AI_Client_Service::is_provider_ready( $selected ) ) {
+          echo esc_html__( 'Requests go through the WordPress AI Client, using the key saved in Connectors.', 'presswell-alt-text-generator' );
+        } else {
+          echo esc_html__( "This connector's provider isn't available to the WordPress AI Client, so the plugin calls it directly with the connector's key.", 'presswell-alt-text-generator' );
+        }
+        ?>
         <a href="<?php echo esc_url( $connectors_url ); ?>"><?php echo esc_html__( 'Configure AI Connectors', 'presswell-alt-text-generator' ); ?></a>
       </p>
     </div>
@@ -738,21 +756,32 @@ trait PWATG_Settings_Trait {
     <?php
   }
 
+  /** Output the opt-in for removing plugin data when the plugin is deleted. */
+  public function render_remove_data_field() {
+    $settings = $this->get_settings();
+    ?>
+    <label>
+      <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[remove_data_on_uninstall]" value="on" <?php checked( isset( $settings['remove_data_on_uninstall'] ) ? $settings['remove_data_on_uninstall'] : '', 'on' ); ?> />
+      <?php echo esc_html__( 'Remove settings and generation history when the plugin is deleted', 'presswell-alt-text-generator' ); ?>
+    </label>
+    <p class="description"><?php echo esc_html__( 'API keys are always removed when the plugin is deleted. Alt text is never removed; it belongs to your images.', 'presswell-alt-text-generator' ); ?></p>
+    <?php
+  }
+
   /** Display the plugin settings page markup. */
   public function render_settings_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
       return;
     }
 
-    if ( is_multisite() && ! is_main_site() ) {
-      echo '<div class="notice notice-info"><p>' . esc_html__( 'Settings are inherited from the main site. Changes here will not take effect.', 'presswell-alt-text-generator' ) . '</p></div>';
-    }
+    $is_subsite = is_multisite() && ! is_main_site();
 
     $active_tab = 'debug' === sanitize_key( $this->get_query_param( 'tab' ) ) ? 'debug' : 'settings';
 
     $this->render_view(
       'settings-page.php',
       [
+        'is_subsite'       => $is_subsite,
         'active_tab'       => $active_tab,
         'settings_tab_url' => admin_url( PWATG::SETTINGS_PAGE_URL ),
         'debug_tab_url'    => $this->get_debug_log_viewer_url(),
@@ -845,6 +874,15 @@ trait PWATG_Settings_Trait {
     );
   }
 
+  /**
+   * Transient that carries a Test Connection result to the admin who ran it.
+   *
+   * @return string
+   */
+  public function get_test_provider_notice_key() {
+    return PWATG::TRANSIENT_NOTICE_TEST_PROVIDER . '_' . get_current_user_id();
+  }
+
   /** Process the "Test Connection" helper form. */
   public function handle_test_provider() {
     if ( ! current_user_can( 'manage_options' ) ) {
@@ -874,8 +912,11 @@ trait PWATG_Settings_Trait {
       }
     }
 
+    // In Core mode on WordPress 7.0+, the AI Client holds the key; no key is needed here.
+    $ai_client_provider = '' === $api_key ? $this->get_wp_ai_client_provider( $settings ) : '';
+
     // The key field is blank when a key is already saved, so test with the saved one.
-    if ( '' === $api_key && '' !== $service ) {
+    if ( '' === $api_key && '' === $ai_client_provider && '' !== $service ) {
       $api_key = $this->resolve_service_api_key( $service, $settings );
     }
 
@@ -886,10 +927,11 @@ trait PWATG_Settings_Trait {
         'model'            => $model,
         'has_api_key'      => '' !== $api_key,
         'connector_source' => $connector_source,
+        'transport'        => '' !== $ai_client_provider ? 'wp_ai_client' : 'direct',
       ]
     );
 
-    if ( '' === $service || '' === $model || '' === $api_key ) {
+    if ( '' === $service || '' === $model || ( '' === $api_key && '' === $ai_client_provider ) ) {
       $this->debug_log(
         'Provider connection test rejected due to missing parameters.',
         [
@@ -899,7 +941,7 @@ trait PWATG_Settings_Trait {
         ]
       );
       set_transient(
-        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
+        $this->get_test_provider_notice_key(),
         [
           'type'    => 'error',
           'message' => __( 'Service, model, and API key are required to test the connection.', 'presswell-alt-text-generator' ),
@@ -911,7 +953,9 @@ trait PWATG_Settings_Trait {
       exit;
     }
 
-    $result = $this->test_provider_connection( $service, $api_key, $model );
+    $result = '' !== $ai_client_provider
+      ? PWATG_WP_AI_Client_Service::request_text( $ai_client_provider, $model, 'Reply with: OK' )
+      : $this->test_provider_connection( $service, $api_key, $model );
 
     if ( is_wp_error( $result ) ) {
       $this->debug_log(
@@ -925,7 +969,7 @@ trait PWATG_Settings_Trait {
         ]
       );
       set_transient(
-        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
+        $this->get_test_provider_notice_key(),
         [
           'type'    => 'error',
           'message' => sprintf(
@@ -960,7 +1004,7 @@ trait PWATG_Settings_Trait {
       }
 
       set_transient(
-        PWATG::TRANSIENT_NOTICE_TEST_PROVIDER,
+        $this->get_test_provider_notice_key(),
         [
           'type'    => 'success',
           'message' => $message,

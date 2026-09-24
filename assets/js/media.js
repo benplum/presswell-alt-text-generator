@@ -8,7 +8,9 @@ jQuery(function($) {
   const inlineFallback = {
     url: data.inlineUrl || '',
     last: data.inlineLast || '',
-    hasAlt: !!data.inlineHasAlt
+    hasAlt: !!data.inlineHasAlt,
+    hasPrevious: !!data.inlineHasPrevious,
+    restoreNonce: data.inlineRestoreNonce || ''
   };
 
   function t(key, fallback) {
@@ -53,23 +55,9 @@ jQuery(function($) {
       return;
     }
 
+    // The Generate action is a row action; the column only shows the text.
     preview.removeClass('is-empty');
     preview.text(altText.trim());
-
-    let actions = container.find('.pwatg-alt-preview-actions').first();
-    if (!actions.length) {
-      actions = container;
-    }
-
-    let regenerateLink = actions.find('.pwatg-generate-alt-action').first();
-    if (!regenerateLink.length) {
-      regenerateLink = $('<a class="pwatg-generate-alt-action" />');
-      actions.append(regenerateLink);
-    }
-
-    regenerateLink
-      .attr('data-has-alt', '1')
-      .text(t('regenerateButton', 'Regenerate Alt Text'));
   }
 
   function syncActionLinksAfterSuccess($button, hasAlt) {
@@ -122,11 +110,15 @@ jQuery(function($) {
       lastText = $.trim(lastTextNode.text().replace(t('lastGeneratedLabel', 'Last generated:'), ''));
     }
 
+    const restore = row.find('.pwatg-restore-alt-action').first();
+
     return {
       url: href,
       attachmentId: link.attr('data-attachment-id') || '',
       hasAlt: String(link.attr('data-has-alt') || '') === '1',
       last: lastText || t('never', 'Never'),
+      hasPrevious: restore.length > 0 && !restore.prop('hidden'),
+      restoreNonce: restore.attr('data-nonce') || '',
       row: row
     };
   }
@@ -305,6 +297,7 @@ jQuery(function($) {
 
       writeHasAltToButton($button, hasAlt);
       syncActionLinksAfterSuccess($button, hasAlt);
+      setRestoreVisible($button.attr('data-attachment-id') || parseActionUrl($button.attr('href')).attachmentId, !!payload.has_previous);
 
       setLastGeneratedForButton($button, payload.last_generated || t('never', 'Never'));
     }).fail(function(xhr) {
@@ -318,6 +311,69 @@ jQuery(function($) {
       }
     }).always(function() {
       setButtonBusy($button, false);
+    });
+  }
+
+  // Update every copy, including the hidden compat field the inline action is rebuilt from.
+  function setRestoreVisible(attachmentId, visible) {
+    const id = String(attachmentId || '');
+    if (!id) {
+      return;
+    }
+
+    $('.pwatg-restore-alt-action').filter(function() {
+      return String($(this).attr('data-attachment-id') || '') === id;
+    }).prop('hidden', !visible);
+
+    if (String(parseActionUrl(inlineFallback.url).attachmentId || '') === id) {
+      inlineFallback.hasPrevious = !!visible;
+    }
+  }
+
+  function handleRestoreClick(event) {
+    const $restore = $(event.currentTarget);
+    const attachmentId = parseInt($restore.attr('data-attachment-id') || '0', 10);
+    const $scope = $restore.closest('.pwatg-inline-action, ' + compatFieldSelector + ', td');
+    const $button = $scope.find('.pwatg-generate-alt-action').first();
+    const $status = $button.length ? getStatusContainerForButton($button) : $();
+
+    event.preventDefault();
+
+    if (!attachmentId || $restore.prop('disabled')) {
+      return;
+    }
+
+    $restore.prop('disabled', true);
+
+    $.post(data.ajaxUrl || window.ajaxurl, {
+      action: data.restoreAction || 'pwatg_restore_alt',
+      attachment_id: attachmentId,
+      nonce: $restore.attr('data-nonce') || ''
+    }).done(function(response) {
+      if (!response || !response.success) {
+        $status.text(t('restoreFailed', 'Could not restore the previous alt text.'));
+        return;
+      }
+
+      const altText = String(response.data.alt_text || '');
+      const $altInput = $button.length ? getAltInputForButton($button) : $();
+      if ($altInput.length) {
+        $altInput.val(altText).trigger('change');
+      }
+
+      if ($button.length) {
+        updatePreviewAfterSuccess($button, altText);
+        writeHasAltToButton($button, hasAltTextValue(altText));
+        syncActionLinksAfterSuccess($button, hasAltTextValue(altText));
+      }
+
+      $status.text(response.data.message || '');
+      setRestoreVisible(attachmentId, false);
+    }).fail(function(xhr) {
+      const message = xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message;
+      $status.text(message || t('restoreFailed', 'Could not restore the previous alt text.'));
+    }).always(function() {
+      $restore.prop('disabled', false);
     });
   }
 
@@ -345,6 +401,16 @@ jQuery(function($) {
     $('<strong>').text(t('lastGeneratedLabel', 'Last generated:')).appendTo($meta);
     $meta.append(document.createTextNode(' ' + String(actionData.last || t('never', 'Never'))));
     $wrapper.append($meta);
+
+    if (actionData.restoreNonce) {
+      $('<button>', {
+        type: 'button',
+        class: 'button-link pwatg-restore-alt-action',
+        text: t('restoreButton', 'Restore previous alt text'),
+        'data-attachment-id': String(actionData.attachmentId || parseActionUrl(actionData.url).attachmentId || ''),
+        'data-nonce': String(actionData.restoreNonce)
+      }).prop('hidden', !actionData.hasPrevious).appendTo($wrapper);
+    }
 
     if (existing.length) {
       existing.replaceWith($wrapper);
@@ -441,4 +507,5 @@ jQuery(function($) {
   $(document).on('attachment:compat:ready wp-mediaelement-loaded', scheduleRefresh);
 
   $(document).on('click', 'a.pwatg-generate-alt-action, .pwatg-inline-action a.button, .pwatg-inline-action a.button-secondary', handleGenerateClick);
+  $(document).on('click', '.pwatg-restore-alt-action', handleRestoreClick);
 });

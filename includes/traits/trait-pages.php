@@ -80,7 +80,12 @@ trait PWATG_Pages_Trait {
       return $footer_text;
     }
 
-    return '<a href="https://presswell.co" target="_blank" rel="noopener">Presswell Supply Co.</a> &bull; Quality Digital Goods';
+    return sprintf(
+      '<a href="%1$s" target="_blank" rel="noopener">%2$s</a> &bull; %3$s',
+      esc_url( 'https://presswell.co' ),
+      esc_html( 'Presswell Supply Co.' ),
+      esc_html__( 'Quality Digital Goods', 'presswell-alt-text-generator' )
+    );
   }
 
   /**
@@ -95,6 +100,7 @@ trait PWATG_Pages_Trait {
       return $version_text;
     }
 
-    return 'Alt Text Generator v' . PWATG::VERSION;
+    /* translators: %s: plugin version number */
+    return esc_html( sprintf( __( 'Alt Text Generator v%s', 'presswell-alt-text-generator' ), PWATG::VERSION ) );
   }
 }

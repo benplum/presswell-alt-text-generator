@@ -25,25 +25,34 @@ class PWATG {
   const BULK_PAGE_SCREEN_ID = 'media_page_' . self::BULK_PAGE_SLUG;
 
   // Assets
+  const ASSET_HANDLE_COMMON_CSS = 'pwatg-css-common';
   const ASSET_HANDLE_ADMIN_CSS = 'pwatg-css-admin';
   const ASSET_HANDLE_SETTINGS_JS = 'pwatg-js-settings';
   const ASSET_HANDLE_BULK_CSS = 'pwatg-css-bulk';
   const ASSET_HANDLE_BULK_JS = 'pwatg-js-bulk';
   const ASSET_HANDLE_MEDIA_JS = 'pwatg-js-media';
+  const ASSET_HANDLE_BLOCK_EDITOR_JS = 'pwatg-js-block-editor';
 
   // Localized JS objects
   const JS_OBJECT_SETTINGS = 'pwatgSettingsData';
   const JS_OBJECT_BULK = 'pwatgBulkData';
   const JS_OBJECT_MEDIA = 'pwatgMediaData';
+  const JS_OBJECT_BLOCK_EDITOR = 'pwatgBlockEditorData';
+
+  // REST API
+  const REST_NAMESPACE = 'pwatg/v1';
   
   // Transient notices
   const TRANSIENT_NOTICE_TEST_PROVIDER = 'pwatg_test_provider_notice';
   const TRANSIENT_NOTICE_TTL = 60;
-  const NOTICE_KEY_TEST_PROVIDER = self::TRANSIENT_NOTICE_TEST_PROVIDER;
 
   // Nonces
   const NONCE_GENERATE_SINGLE = 'pwatg_generate_single_';
   const NONCE_GENERATE_BULK = 'pwatg_generate_bulk';
+
+  // Bulk runs: one at a time per site, so two admins don't pay for the same images.
+  const OPTION_BULK_RUN = 'pwatg_bulk_run';
+  const BULK_RUN_STALE_SECONDS = 120;
 
   // Rate limiting
   const RATE_LIMIT_TRANSIENT = 'pwatg_rate_limit_lock';
@@ -58,10 +67,13 @@ class PWATG {
   const AJAX_INIT_BULK = 'pwatg_bulk_init';
   const AJAX_TEST_PROVIDER = 'pwatg_test_provider';
   const AJAX_SCAN_MISSING = 'pwatg_scan_missing_alt';
+  const AJAX_RESTORE_ALT = 'pwatg_restore_alt';
+  const NONCE_RESTORE_ALT = 'pwatg_restore_alt_';
   
   // Meta Keys
   const META_KEY_ALT_TEXT = '_wp_attachment_image_alt';
   const META_KEY_LAST_GENERATED = '_pwatg_last_generated';
+  const META_KEY_PREVIOUS_ALT = '_pwatg_previous_alt';
 
   // Debug log
   const DEBUG_LOG_LEGACY_FILENAME = 'debug-pwad.log';
@@ -83,6 +95,9 @@ class PWATG {
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';
   const MEDIA_COLUMN_ALT = 'pwatg_alt_text';
   
+  // Image types bulk runs process; formats providers reject are converted to JPEG first.
+  const BULK_MIME_TYPES = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ];
+
   // AI Providers  
   const PROVIDER_OPENAI = 'openai';
   const PROVIDER_ANTHROPIC = 'anthropic';

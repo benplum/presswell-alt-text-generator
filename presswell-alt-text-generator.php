@@ -20,6 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/includes/helpers/class-constants.php';
 require_once __DIR__ . '/includes/traits/trait-assets.php';
+require_once __DIR__ . '/includes/traits/trait-block-editor.php';
 require_once __DIR__ . '/includes/traits/trait-bulk.php';
 require_once __DIR__ . '/includes/traits/trait-cli.php';
 require_once __DIR__ . '/includes/traits/trait-helpers.php';
@@ -32,6 +33,7 @@ require_once __DIR__ . '/includes/services/class-openai-service.php';
 require_once __DIR__ . '/includes/services/class-anthropic-service.php';
 require_once __DIR__ . '/includes/services/class-gemini-service.php';
 require_once __DIR__ . '/includes/services/class-provider-registry.php';
+require_once __DIR__ . '/includes/services/class-wp-ai-client-service.php';
 require_once __DIR__ . '/includes/services/class-bulk-service.php';
 require_once __DIR__ . '/includes/support/cli.php';
 
@@ -41,6 +43,7 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
    */
   class Presswell_Alt_Text_Generator {
     use PWATG_Assets_Trait;
+    use PWATG_Block_Editor_Trait;
     use PWATG_Bulk_Trait;
     use PWATG_CLI_Trait;
     use PWATG_Helpers_Trait;
@@ -63,6 +66,7 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
      */
     protected function __construct() {
       $this->construct_assets_trait();
+      $this->construct_block_editor_trait();
       $this->construct_bulk_trait();
       $this->construct_media_trait();
 

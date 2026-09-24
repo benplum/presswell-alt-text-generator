@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
   ?>
   <div class="pwatg-count">
     <h2 class="pwatg-count-title">
-      Images missing alt text: 
+      <?php echo esc_html__( 'Images missing alt text:', 'presswell-alt-text-generator' ); ?>
       <span id="pwatg_missing_count" data-initial="<?php echo esc_attr( $missing_alt_count ); ?>">
         <?php echo esc_html( number_format_i18n( $missing_alt_count ) ); ?>
       </span>
@@ -60,7 +60,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     </label>
   </p>
 
-  <p>
+  <p class="pwatg-bulk-actions">
     <button type="button" class="button button-primary" id="pwatg_start_bulk"><?php echo esc_html__( 'Run Bulk Generation', 'presswell-alt-text-generator' ); ?></button>
     <button type="button" class="button pwatg-pause-bulk" id="pwatg_pause_bulk">
       <?php echo esc_html__( 'Pause', 'presswell-alt-text-generator' ); ?>
@@ -68,7 +68,7 @@ if ( ! defined( 'ABSPATH' ) ) {
   </p>
 
   <div id="pwatg_progress_wrap" class="pwatg-progress-wrap">
-    <div class="pwatg-progress-track">
+    <div class="pwatg-progress-track" role="progressbar" aria-labelledby="pwatg_progress_text" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="pwatg_progress_bar" class="pwatg-progress-bar"></div>
     </div>
     <p id="pwatg_progress_text" class="pwatg-progress-text"></p>
@@ -77,10 +77,10 @@ if ( ! defined( 'ABSPATH' ) ) {
   <table id="pwatg_results_table" class="wp-list-table widefat fixed striped pwatg-results-table">
     <thead>
       <tr>
-        <th class="pwatg-col-thumb"><?php echo esc_html__( 'Thumbnail', 'presswell-alt-text-generator' ); ?></th>
-        <th class="pwatg-col-id"><?php echo esc_html__( 'Media ID', 'presswell-alt-text-generator' ); ?></th>
-        <th class="pwatg-col-status"><?php echo esc_html__( 'Status', 'presswell-alt-text-generator' ); ?></th>
-        <th><?php echo esc_html__( 'Alt Text Generated', 'presswell-alt-text-generator' ); ?></th>
+        <th scope="col" class="pwatg-col-thumb"><?php echo esc_html__( 'Thumbnail', 'presswell-alt-text-generator' ); ?></th>
+        <th scope="col" class="pwatg-col-id"><?php echo esc_html__( 'Media ID', 'presswell-alt-text-generator' ); ?></th>
+        <th scope="col" class="pwatg-col-status"><?php echo esc_html__( 'Status', 'presswell-alt-text-generator' ); ?></th>
+        <th scope="col"><?php echo esc_html__( 'Alt Text Generated', 'presswell-alt-text-generator' ); ?></th>
       </tr>
     </thead>
     <tbody id="pwatg_results_body"></tbody>

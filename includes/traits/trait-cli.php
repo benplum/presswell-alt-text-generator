@@ -75,6 +75,7 @@ trait PWATG_CLI_Trait {
       'halted'            => false,
       'halt_message'      => '',
       'missing_remaining' => 0,
+      'error'             => '',
     ];
 
     $lock = $this->get_rate_limit_lock_state();
@@ -98,9 +99,30 @@ trait PWATG_CLI_Trait {
       return $result;
     }
 
+    $run_id = $this->acquire_bulk_run( 'WP-CLI' );
+    if ( is_wp_error( $run_id ) ) {
+      $result['ok']    = false;
+      $result['error'] = $run_id->get_error_message();
+
+      return $result;
+    }
+
     $this->debug_log( 'CLI bulk run started.', [ 'selected' => $selected, 'overwrite' => $overwrite ] );
 
-    $run = $service->run_bulk_generation( $force, $limit, $missing_only, $callback );
+    // Check in after each image so a browser run can't take over mid-run.
+    $on_item = function ( $attachment_id, $status, $message ) use ( $callback, $run_id ) {
+      $this->touch_bulk_run( $run_id );
+
+      if ( $callback ) {
+        call_user_func( $callback, $attachment_id, $status, $message );
+      }
+    };
+
+    try {
+      $run = $service->run_bulk_generation( $force, $limit, $missing_only, $on_item );
+    } finally {
+      $this->release_bulk_run( $run_id );
+    }
 
     $result['processed']         = (int) $run['processed'];
     $result['updated']           = (int) $run['updated'];

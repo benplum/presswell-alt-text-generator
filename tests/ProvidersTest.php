@@ -146,6 +146,28 @@ class ProvidersTest extends WP_UnitTestCase {
   }
 
   /**
+   * @dataProvider provider_gemini_models
+   */
+  public function test_gemini_leaves_room_for_the_answer_after_thinking( $model, $expects_thinking_off ) {
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent';
+    $this->mock_http_response( $url, $this->build_http_response( 200, [ 'candidates' => [ [ 'content' => [ 'parts' => [ [ 'text' => 'OK' ] ] ] ] ] ] ) );
+
+    PWATG_Gemini_Service::request_text( 'gm-key', $model, 'Reply with: OK' );
+
+    $config = json_decode( $this->captured_request['body'], true )['generationConfig'];
+    $this->assertGreaterThanOrEqual( 512, $config['maxOutputTokens'], 'Thinking tokens count toward the cap.' );
+    $this->assertSame( $expects_thinking_off, isset( $config['thinkingConfig']['thinkingBudget'] ) && 0 === $config['thinkingConfig']['thinkingBudget'] );
+  }
+
+  public function provider_gemini_models() {
+    return [
+      'flash'      => [ 'gemini-2.5-flash', true ],
+      'flash-lite' => [ 'gemini-2.5-flash-lite', true ],
+      'pro'        => [ 'gemini-2.5-pro', false ],
+    ];
+  }
+
+  /**
    * @dataProvider provider_error_responses
    */
   public function test_provider_errors_map_to_the_right_pause( $service, $status, $body, $expected_code, $expected_retry ) {
@@ -196,7 +218,7 @@ class ProvidersTest extends WP_UnitTestCase {
 
     $lock->invoke( $plugin, new WP_Error( 'pwatg_api_error', 'Not allowed', [ 'http_code' => 403, 'provider' => 'anthropic' ] ) );
 
-    $this->assertFalse( get_transient( PWATG::RATE_LIMIT_TRANSIENT ) );
+    $this->assertFalse( pwatg_test_get_lock() );
   }
 
   /**

@@ -55,6 +55,82 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $this->assertNotEmpty( $response['data']['last_generated'] );
   }
 
+  public function test_regenerating_keeps_the_overwritten_alt_text_for_restore() {
+    $attachment_id = $this->create_image_attachment();
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'Written by a person' );
+
+    $response = $this->generate( $attachment_id );
+
+    $this->assertTrue( $response['data']['has_previous'] );
+    $this->assertSame( 'Written by a person', get_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, true ) );
+
+    $response = $this->restore( $attachment_id );
+
+    $this->assertTrue( $response['success'] );
+    $this->assertSame( 'Written by a person', $response['data']['alt_text'] );
+    $this->assertSame( 'Written by a person', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+    $this->assertSame( '', get_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, true ), 'Restoring is one step.' );
+  }
+
+  public function test_generating_for_an_image_without_alt_text_has_nothing_to_restore() {
+    $attachment_id = $this->create_image_attachment();
+    delete_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT );
+
+    $response = $this->generate( $attachment_id );
+
+    $this->assertFalse( $response['data']['has_previous'] );
+    $this->assertFalse( $this->restore( $attachment_id )['success'] );
+  }
+
+  public function test_restore_requires_permission_a_post_and_its_own_nonce() {
+    $attachment_id = $this->create_image_attachment();
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'AI text' );
+    update_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, 'Written by a person' );
+
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $this->assertFalse( $this->restore( $attachment_id )['success'], 'GET is rejected.' );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+
+    $this->assertNull( $this->restore( $attachment_id, PWATG::NONCE_GENERATE_SINGLE . $attachment_id ), 'The generate nonce is not accepted.' );
+
+    $this->_setRole( 'contributor' );
+    $this->assertFalse( $this->restore( $attachment_id )['success'] );
+
+    $this->assertSame( 'AI text', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  protected function generate( $attachment_id ) {
+    $_POST = [
+      'attachment_id' => $attachment_id,
+      'nonce'         => wp_create_nonce( PWATG::NONCE_GENERATE_SINGLE . $attachment_id ),
+    ];
+
+    return $this->call( PWATG::AJAX_GENERATE_SINGLE );
+  }
+
+  protected function restore( $attachment_id, $nonce_action = null ) {
+    $_POST = [
+      'attachment_id' => $attachment_id,
+      'nonce'         => wp_create_nonce( null === $nonce_action ? PWATG::NONCE_RESTORE_ALT . $attachment_id : $nonce_action ),
+    ];
+
+    return $this->call( PWATG::AJAX_RESTORE_ALT );
+  }
+
+  protected function call( $action ) {
+    $this->_last_response = '';
+
+    try {
+      $this->_handleAjax( $action );
+    } catch ( WPAjaxDieContinueException $e ) {
+      // Expected WordPress ajax termination.
+    } catch ( WPAjaxDieStopException $e ) {
+      // Expected WordPress ajax termination; check_ajax_referer() failures end up here.
+    }
+
+    return json_decode( $this->_last_response, true );
+  }
+
   public function test_ajax_handler_rejects_get_requests() {
     $attachment_id = $this->create_image_attachment();
     delete_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT );

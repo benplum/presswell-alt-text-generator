@@ -19,7 +19,7 @@ class SettingsPageTest extends WP_UnitTestCase {
   protected function tearDown(): void {
     remove_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
     remove_filter( 'wp_redirect', [ $this, 'intercept_redirect' ], 10 );
-    delete_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
+    delete_transient( $this->plugin->get_test_provider_notice_key() );
     parent::tearDown();
   }
 
@@ -49,7 +49,7 @@ class SettingsPageTest extends WP_UnitTestCase {
       $this->assertSame( 'redirect', $e->getMessage() );
     }
 
-    $notice = get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
+    $notice = get_transient( $this->plugin->get_test_provider_notice_key() );
     $this->assertNotEmpty( $notice );
     $this->assertSame( 'success', $notice['type'] );
     $this->assertStringContainsString( 'Connection successful', $notice['message'] );
@@ -72,7 +72,7 @@ class SettingsPageTest extends WP_UnitTestCase {
     }
 
     $this->assertSame( 'sk-saved', PWATG_Test_Provider::$last_request['api_key'] );
-    $this->assertSame( 'success', get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER )['type'] );
+    $this->assertSame( 'success', get_transient( $this->plugin->get_test_provider_notice_key() )['type'] );
   }
 
   public function test_saved_api_keys_are_not_printed_in_the_page() {
@@ -111,5 +111,26 @@ class SettingsPageTest extends WP_UnitTestCase {
     $sanitized = $this->plugin->sanitize_settings( [ 'debug_logging' => 'off' ] );
 
     $this->assertSame( 'gm-saved', $sanitized['api_keys']['gemini'] );
+  }
+
+  public function test_connection_results_are_shown_only_to_the_admin_who_ran_them() {
+    $_POST = [
+      'pwatg_test_provider_nonce' => wp_create_nonce( PWATG::AJAX_TEST_PROVIDER ),
+      'service'                   => 'openai',
+      'model'                     => 'gpt-4.1-mini',
+      'api_key'                   => 'sk-test',
+    ];
+    $_REQUEST = $_POST;
+
+    try {
+      $this->plugin->handle_test_provider();
+    } catch ( Exception $e ) {
+      $this->assertSame( 'redirect', $e->getMessage() );
+    }
+
+    $this->assertNotEmpty( get_transient( $this->plugin->get_test_provider_notice_key() ) );
+
+    wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
+    $this->assertFalse( get_transient( $this->plugin->get_test_provider_notice_key() ) );
   }
 }

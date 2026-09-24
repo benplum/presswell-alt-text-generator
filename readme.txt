@@ -138,6 +138,11 @@ This plugin connects to external AI services only when you use alt text generati
 
 == Changelog ==
 
+= 1.2.0 =
+* Fixed various performance and security issues.
+* Added site language support and filter.
+* Added debug functionality and imporoved logging.
+
 = 1.1.0 =
 * Added WordPress 7.0 Core AI Connector support with connector mode setting.
 

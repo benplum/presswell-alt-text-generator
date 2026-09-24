@@ -21,6 +21,7 @@ jQuery(function($) {
 
   // Lowest attachment ID processed so far; the server fetches the next batch below it.
   let cursor = 0;
+  let runId = '';
   let total = 0;
   let processed = 0;
   let updated = 0;
@@ -121,10 +122,24 @@ jQuery(function($) {
     }
   })();
 
+  function format(template, values) {
+    let index = 0;
+    return String(template).replace(/%(\d+)\$s|%s|%d/g, function(match, position) {
+      const value = position ? values[parseInt(position, 10) - 1] : values[index++];
+      return typeof value === 'undefined' ? match : String(value);
+    });
+  }
+
   function updateProgress() {
-    const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
-    progressBar.css('width', Math.min(percent, 100) + '%');
-    progressText.text('Processed ' + processed + ' of ' + total + ' · Updated: ' + updated + ' · Failed: ' + failed);
+    const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+    progressBar.css('width', percent + '%');
+    progressBar.parent().attr('aria-valuenow', percent);
+    progressText.text(format(t('progress', 'Processed %1$s of %2$s · Updated: %3$s · Failed: %4$s'), [
+      formatNumber(processed),
+      formatNumber(total),
+      formatNumber(updated),
+      formatNumber(failed)
+    ]));
   }
 
   function appendRows(items) {
@@ -132,41 +147,52 @@ jQuery(function($) {
       return;
     }
 
+    const labels = {
+      updated: t('statusUpdated', 'Updated'),
+      failed: t('statusFailed', 'Failed'),
+      skipped: t('statusSkipped', 'Skipped')
+    };
+    const tones = {
+      updated: 'is-success',
+      failed: 'is-error'
+    };
+
     resultsTable.show();
+
+    // Build nodes rather than HTML strings so server values are always inserted as text.
     items.forEach(function(item) {
-      const thumb = item.thumb ? '<img src="' + String(item.thumb) + '" alt="" class="pwatg-thumb-image" />' : '';
-      const mediaId = item.id ? String(item.id) : '';
-      const status = item.status ? String(item.status) : '';
-      const safeStatus = $('<div>').text(status || 'skipped').html();
-      const statusClass = status === 'updated' ? 'pwatg-status-updated' : (status === 'failed' ? 'pwatg-status-failed' : 'pwatg-status-skipped');
-      const statusBadge = '<span class="pwatg-status-badge ' + statusClass + '">' + safeStatus + '</span>';
-      const altText = item.alt ? String(item.alt) : (item.status === 'failed' ? t('failedAlt', '[Failed to generate]') : '');
-      const altHtml = $('<div>').text(altText).html();
-      const errorMessage = item.error_message ? String(item.error_message) : '';
-      const errorCode = item.error_code ? String(item.error_code) : '';
-      let detailHtml = altHtml;
-
-      if (status === 'failed' && errorMessage) {
-        const safeError = $('<div>').text(errorMessage).html();
-        const safeCode = errorCode ? $('<div>').text(errorCode).html() : '';
-        detailHtml += '<div class="pwatg-result-error">';
-        if (safeCode) {
-          detailHtml += '<span class="pwatg-result-error-code">' + safeCode + '</span>';
-        }
-        detailHtml += '<span class="pwatg-result-error-message">' + safeError + '</span>';
-
-        if (item.error_retry_after) {
-          const retrySeconds = parseInt(item.error_retry_after, 10);
-          if (!isNaN(retrySeconds) && retrySeconds > 0) {
-            const minutes = Math.ceil(retrySeconds / 60);
-            detailHtml += '<span class="pwatg-result-error-hint"> · ' + minutes + 'm</span>';
-          }
-        }
-
-        detailHtml += '</div>';
+      const status = labels[item.status] ? String(item.status) : 'skipped';
+      const $thumbCell = $('<td>');
+      if (item.thumb) {
+        $thumbCell.append($('<img>', { src: String(item.thumb), alt: '', class: 'pwatg-thumb-image' }));
       }
 
-      resultsBody.append('<tr><td>' + thumb + '</td><td>' + mediaId + '</td><td>' + statusBadge + '</td><td>' + detailHtml + '</td></tr>');
+      const altText = item.alt ? String(item.alt) : (status === 'failed' ? t('failedAlt', '[Failed to generate]') : '');
+      const $detailCell = $('<td>').text(altText);
+
+      if (status === 'failed' && item.error_message) {
+        const $error = $('<div>', { class: 'pwatg-result-error' });
+        if (item.error_code) {
+          $error.append($('<span>', { class: 'pwatg-result-error-code', text: String(item.error_code) }));
+        }
+        $error.append($('<span>', { class: 'pwatg-result-error-message', text: String(item.error_message) }));
+
+        const retrySeconds = parseInt(item.error_retry_after, 10);
+        if (!isNaN(retrySeconds) && retrySeconds > 0) {
+          $error.append(document.createTextNode(' · ' + format(t('retryMinutes', 'retry in %d min'), [Math.ceil(retrySeconds / 60)])));
+        }
+
+        $detailCell.append($error);
+      }
+
+      resultsBody.append(
+        $('<tr>').append(
+          $thumbCell,
+          $('<td>').text(item.id ? String(item.id) : ''),
+          $('<td>').append($('<span>', { class: 'pwatg-badge ' + (tones[status] || ''), text: labels[status] })),
+          $detailCell
+        )
+      );
     });
   }
 
@@ -176,7 +202,11 @@ jQuery(function($) {
     isBatchInFlight = false;
     pauseButton.hide().text(t('pause', 'Pause'));
     startButton.prop('disabled', false).text(t('runBulk', 'Run Bulk Generation'));
-    progressText.text(message + ' Processed: ' + processed + ' · Updated: ' + updated + ' · Failed: ' + failed);
+    progressText.text(message + ' ' + format(t('summary', 'Processed: %1$s · Updated: %2$s · Failed: %3$s'), [
+      formatNumber(processed),
+      formatNumber(updated),
+      formatNumber(failed)
+    ]));
     toggleBeforeUnloadWarning(false);
   }
 
@@ -197,6 +227,8 @@ jQuery(function($) {
       action: ajaxAction,
       nonce: getNonce(),
       cursor: cursor,
+      run_id: runId,
+      remaining: Math.max(0, total - processed),
       batch_size: Math.max(1, Math.min(batchSize, total - processed)),
       regenerate_existing: regenerateInput.is(':checked') ? 1 : 0,
       run_test: runTestInput.is(':checked') ? 1 : 0
@@ -226,7 +258,7 @@ jQuery(function($) {
           const haltSeconds = parseInt(response.data.halt_retry_after, 10);
           if (!isNaN(haltSeconds) && haltSeconds > 0) {
             const minutes = Math.ceil(haltSeconds / 60);
-            haltMessage += ' (' + minutes + 'm)';
+            haltMessage += ' (' + format(t('retryMinutes', 'retry in %d min'), [minutes]) + ')';
           }
         }
 
@@ -295,6 +327,7 @@ jQuery(function($) {
       }
 
       total = response.data.total || 0;
+      runId = response.data.run_id || '';
       cursor = 0;
       processed = 0;
       updated = 0;

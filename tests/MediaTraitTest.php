@@ -174,10 +174,23 @@ class MediaTraitTest extends WP_UnitTestCase {
     $output = ob_get_clean();
 
     $this->assertStringContainsString( 'Preview alt text contents', $output );
-    $this->assertStringContainsString( 'Regenerate', $output );
+    $this->assertStringNotContainsString( 'pwatg-generate-alt-action', $output, 'The action is a row action, not repeated in the column.' );
   }
 
-  public function test_media_alt_column_renders_generate_link_when_empty() {
+  public function test_media_row_action_offers_generate_or_regenerate() {
+    wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
+    $attachment_id = $this->create_image_attachment();
+    delete_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT );
+
+    $actions = $this->plugin->add_media_row_action( [], get_post( $attachment_id ) );
+    $this->assertStringContainsString( 'Generate Alt Text', $actions[ PWATG::FIELD_GENERATE_SINGLE ] );
+
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'Existing' );
+    $actions = $this->plugin->add_media_row_action( [], get_post( $attachment_id ) );
+    $this->assertStringContainsString( 'Regenerate Alt Text', $actions[ PWATG::FIELD_GENERATE_SINGLE ] );
+  }
+
+  public function test_media_alt_column_marks_missing_alt_text() {
     $user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
     wp_set_current_user( $user_id );
 
@@ -188,8 +201,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $this->plugin->render_media_alt_column( PWATG::MEDIA_COLUMN_ALT, $attachment_id );
     $output = ob_get_clean();
 
-    $this->assertStringContainsString( 'pwatg-generate-alt-action', $output );
-    $this->assertStringContainsString( 'Generate Alt Text', $output );
+    $this->assertStringContainsString( 'pwatg-alt-preview is-empty', $output );
   }
 
   protected function seed_settings() {

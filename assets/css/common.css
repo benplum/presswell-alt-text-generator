@@ -1,0 +1,38 @@
+/*
+ * Shared by the plugin's admin screens. Uses the core admin palette so the plugin
+ * reads as part of WordPress.
+ */
+
+/* Badges: small status labels, squared off like core buttons. */
+
+.pwatg-badge {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 2px;
+  background: #f0f0f1;
+  color: #50575e;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 2;
+  white-space: nowrap;
+}
+
+.pwatg-badge.is-success {
+  background: #edfaef;
+  color: #007017;
+}
+
+.pwatg-badge.is-error {
+  background: #fcf0f1;
+  color: #b32d2e;
+}
+
+.pwatg-badge.is-warning {
+  background: #fcf9e8;
+  color: #996800;
+}
+
+.pwatg-badge.is-info {
+  background: #f0f6fc;
+  color: #0a4b78;
+}

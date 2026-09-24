@@ -21,6 +21,7 @@ trait PWATG_Media_Trait {
     add_filter( 'wp_generate_attachment_metadata', [ $this, 'maybe_generate_on_upload_from_metadata' ], 20, 2 );
     add_action( 'admin_post_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation_ajax' ] );
+    add_action( 'wp_ajax_' . PWATG::AJAX_RESTORE_ALT, [ $this, 'handle_restore_alt_ajax' ] );
     add_filter( 'media_row_actions', [ $this, 'add_media_row_action' ], 10, 2 );
     add_filter( 'attachment_fields_to_edit', [ $this, 'add_media_modal_action_field' ], 10, 2 );
     add_filter( 'manage_upload_columns', [ $this, 'add_media_alt_column' ] );
@@ -71,19 +72,14 @@ trait PWATG_Media_Trait {
 
     $alt_text = trim( (string) get_post_meta( $post_id, PWATG::META_KEY_ALT_TEXT, true ) );
 
-    $action_url = $this->get_single_action_url( $post_id );
+    // Generate/Regenerate lives in the row actions, like core's other per-item actions.
     echo '<div class="pwatg-alt-preview-container">';
 
     if ( '' === $alt_text ) {
-      echo '<span class="pwatg-alt-preview is-empty">';
-      echo '</span>';
+      echo '<span class="pwatg-alt-preview is-empty">&mdash;</span>';
     } else {
       echo '<span class="pwatg-alt-preview">' . esc_html( $alt_text ) . '</span>';
     }
-    
-    echo '<a class="pwatg-generate-alt-action" href="' . esc_url( $action_url ) . '" data-attachment-id="' . esc_attr( $post_id ) . '" data-has-alt="' . ( '' === $alt_text ? '0' : '1' ) . '">';
-    echo '' === $alt_text ? esc_html__( 'Generate Alt Text', 'presswell-alt-text-generator' ) : esc_html__( 'Regenerate Alt Text', 'presswell-alt-text-generator' );
-    echo '</a>';
 
     echo '</div>';
   }
@@ -153,6 +149,8 @@ trait PWATG_Media_Trait {
           'has_alt'        => $has_alt,
           'button_label'   => $has_alt ? __( 'Regenerate Alt Text', 'presswell-alt-text-generator' ) : __( 'Generate Alt Text', 'presswell-alt-text-generator' ),
           'last_generated' => $last_generated,
+          'has_previous'   => $this->has_previous_alt( $post->ID ),
+          'restore_nonce'  => wp_create_nonce( PWATG::NONCE_RESTORE_ALT . $post->ID ),
 
         ]
       ),
@@ -371,8 +369,47 @@ trait PWATG_Media_Trait {
         'attachment_id'  => $attachment_id,
         'alt_text'       => $alt_text,
         'last_generated' => $last_generated,
+        'has_previous'   => $this->has_previous_alt( $attachment_id ),
       ]
     );
+  }
+
+  /** AJAX: put back the alt text that the last generation replaced. */
+  public function handle_restore_alt_ajax() {
+    $attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
+
+    if ( ! $attachment_id || ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
+      wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) ], 403 );
+    }
+
+    check_ajax_referer( PWATG::NONCE_RESTORE_ALT . $attachment_id, 'nonce' );
+    $this->require_post_request();
+
+    $previous = (string) get_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, true );
+    if ( '' === $previous ) {
+      wp_send_json_error( [ 'message' => __( 'There is no earlier alt text to restore.', 'presswell-alt-text-generator' ) ], 404 );
+    }
+
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, $previous );
+    delete_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT );
+
+    $this->debug_log( 'Previous alt text restored.', [ 'attachment_id' => $attachment_id ] );
+
+    wp_send_json_success(
+      [
+        'message'  => __( 'Previous alt text restored.', 'presswell-alt-text-generator' ),
+        'alt_text' => $previous,
+      ]
+    );
+  }
+
+  /**
+   * @param int $attachment_id Attachment ID.
+   *
+   * @return bool Whether an overwritten alt text can be restored.
+   */
+  protected function has_previous_alt( $attachment_id ) {
+    return '' !== (string) get_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, true );
   }
 
   /**
@@ -477,9 +514,9 @@ trait PWATG_Media_Trait {
     }
 
     if ( '' !== $page && PWATG::SETTINGS_PAGE_SLUG === $page ) {
-      $test_notice = get_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
+      $test_notice = get_transient( $this->get_test_provider_notice_key() );
       if ( is_array( $test_notice ) && isset( $test_notice['message'] ) ) {
-        delete_transient( PWATG::TRANSIENT_NOTICE_TEST_PROVIDER );
+        delete_transient( $this->get_test_provider_notice_key() );
         $class = ( isset( $test_notice['type'] ) && 'success' === $test_notice['type'] ) ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
         echo wp_kses_post( $this->render_view_to_string(
           'admin-notice.php',

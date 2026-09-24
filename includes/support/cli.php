@@ -147,6 +147,10 @@ function pwatg_register_cli_commands() {
         WP_CLI::error( 'Generation is paused by a provider limit. ' . $result['halt_message'] );
       }
 
+      if ( ! $result['ok'] ) {
+        WP_CLI::error( $result['error'] );
+      }
+
       if ( 0 === $result['selected'] ) {
         WP_CLI::success( 'No matching attachments found.' );
         return;
@@ -184,6 +188,11 @@ function pwatg_register_cli_commands() {
       }
 
       foreach ( $result['sites'] as $site_id => $site ) {
+        if ( '' !== $site['error'] ) {
+          WP_CLI::warning( sprintf( '[site %d] %s - %s', $site_id, $site['url'], $site['error'] ) );
+          continue;
+        }
+
         if ( 0 === $site['selected'] ) {
           WP_CLI::log( sprintf( '[site %d] %s - no matching attachments.', $site_id, $site['url'] ) );
           continue;

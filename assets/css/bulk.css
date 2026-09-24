@@ -1,3 +1,5 @@
+/* Progress: mirrors core's upload progress bar, in the admin color scheme. */
+
 .pwatg-progress-wrap {
   display: none;
   max-width: 640px;
@@ -5,26 +7,29 @@
 }
 
 .pwatg-progress-track {
-  height: 14px;
-  background: #e2e4e7;
-  border-radius: 999px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .pwatg-progress-bar {
-  height: 14px;
+  height: 100%;
   width: 0;
-  background: #2271b1;
-  transition: width .2s ease;
+  background: var(--wp-admin-theme-color, #2271b1);
+  border-radius: 2px;
+  transition: width 0.2s ease;
 }
 
 .pwatg-progress-text {
   margin-top: 8px;
 }
 
+/* Results */
+
 .pwatg-results-table {
   display: none;
-  max-width: 900px;
+  max-width: 1000px;
   margin-top: 16px;
 }
 
@@ -46,75 +51,48 @@
   object-fit: cover;
 }
 
-.pwatg-status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: capitalize;
-  line-height: 1.6;
-}
-
-.pwatg-status-updated {
-  background: #d1e7dd;
-  color: #0f5132;
-}
-
-.pwatg-status-failed {
-  background: #f8d7da;
-  color: #842029;
-}
-
-.pwatg-status-skipped {
-  background: #e2e3e5;
-  color: #41464b;
-}
-
+/* Matches the error notice: red left border on the error tint. */
 .pwatg-result-error {
   margin-top: 6px;
   padding: 6px 8px;
-  border-left: 3px solid #d63638;
-  background: #fff5f5;
+  border-left: 4px solid #d63638;
+  background: #fcf0f1;
+  color: #b32d2e;
   font-size: 12px;
-  color: #842029;
 }
 
 .pwatg-result-error-code {
-  font-weight: 600;
-  text-transform: uppercase;
   margin-right: 6px;
+  font-family: Consolas, Monaco, monospace;
 }
 
-.pwatg-result-error-hint {
-  margin-left: 4px;
-  font-weight: 600;
-  color: #5c1a1d;
-}
+/* Missing count */
 
 .pwatg-count {
-  margin-top: 2em;
-  margin-bottom: 2em;
+  margin: 2em 0;
 }
 
 .pwatg-count-title {
-  margin: 0 0 .3em;
+  margin: 0 0 0.3em;
 }
 
 .pwatg-count-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
 }
 
 .pwatg-count-actions .button-link {
   padding-left: 0;
-  font-weight: 600;
 }
 
 .pwatg-inline-status {
-  font-weight: 600;
+  color: #646970;
+}
+
+.pwatg-bulk-actions .button + .button {
+  margin-left: 8px;
 }
 
 .pwatg-pause-bulk {

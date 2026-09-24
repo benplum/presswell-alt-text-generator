@@ -31,9 +31,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
             ],
           ],
         ],
-        'generationConfig' => [
-          'maxOutputTokens' => 80,
-        ],
+        'generationConfig' => self::generation_config( $model ),
       ];
 
       $response = self::request( self::build_url( $model ), $api_key, $body, 45 );
@@ -60,9 +58,7 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
             ],
           ],
         ],
-        'generationConfig' => [
-          'maxOutputTokens' => 30,
-        ],
+        'generationConfig' => self::generation_config( $model ),
       ];
 
       $response = self::request( self::build_url( $model ), $api_key, $body, 30 );
@@ -71,6 +67,29 @@ if ( ! class_exists( 'PWATG_Gemini_Service' ) ) {
       }
 
       return self::extract_text_parts( $response, 'pwatg_connection_error', __( 'No response text returned by provider.', 'presswell-alt-text-generator' ) );
+    }
+
+    /**
+     * Output settings for a short answer.
+     *
+     * Gemini 2.5 models think before answering, and thinking tokens count toward
+     * maxOutputTokens, so a small cap can leave no room for the answer. Flash models
+     * can turn thinking off; Pro can't, so the cap leaves room for its minimum budget.
+     *
+     * @param string $model Model ID.
+     *
+     * @return array
+     */
+    private static function generation_config( $model ) {
+      $config = [
+        'maxOutputTokens' => 1024,
+      ];
+
+      if ( false !== strpos( (string) $model, 'flash' ) ) {
+        $config['thinkingConfig'] = [ 'thinkingBudget' => 0 ];
+      }
+
+      return $config;
     }
 
     /** Compose the REST endpoint for the selected model. */

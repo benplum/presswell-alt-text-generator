@@ -31,3 +31,5 @@ node_modules/
 *.tar.gz
 *.zip
 wp_sync.sh
+AGENTS.md
+CLAUDE.md
