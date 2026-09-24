@@ -12,13 +12,13 @@ class PWATG {
   const KEY = 'pwatg';
   const SETTINGS_KEY = 'pwatg_settings';
   const TEXT_DOMAIN = 'presswell-alt-text-generator';
-  const VERSION = '1.1.0';
-  
+  const VERSION = '1.2.0';
+
   // Settings Page
   const SETTINGS_PAGE_SLUG = 'presswell-alt-text-generator';
   const SETTINGS_PAGE_URL = 'options-general.php?page=' . self::SETTINGS_PAGE_SLUG;
   const SETTINGS_PAGE_SCREEN_ID = 'settings_page_' . self::SETTINGS_PAGE_SLUG;
-  
+
   // Bulk Page
   const BULK_PAGE_SLUG = 'presswell-alt-text-bulk-generator';
   const BULK_PAGE_URL = 'upload.php?page=' . self::BULK_PAGE_SLUG;
@@ -41,7 +41,7 @@ class PWATG {
 
   // REST API
   const REST_NAMESPACE = 'pwatg/v1';
-  
+
   // Transient notices
   const TRANSIENT_NOTICE_TEST_PROVIDER = 'pwatg_test_provider_notice';
   const TRANSIENT_NOTICE_TTL = 60;
@@ -69,7 +69,7 @@ class PWATG {
   const AJAX_SCAN_MISSING = 'pwatg_scan_missing_alt';
   const AJAX_RESTORE_ALT = 'pwatg_restore_alt';
   const NONCE_RESTORE_ALT = 'pwatg_restore_alt_';
-  
+
   // Meta Keys
   const META_KEY_ALT_TEXT = '_wp_attachment_image_alt';
   const META_KEY_LAST_GENERATED = '_pwatg_last_generated';
@@ -94,11 +94,11 @@ class PWATG {
   // Field Keys
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';
   const MEDIA_COLUMN_ALT = 'pwatg_alt_text';
-  
+
   // Image types bulk runs process; formats providers reject are converted to JPEG first.
   const BULK_MIME_TYPES = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ];
 
-  // AI Providers  
+  // AI Providers
   const PROVIDER_OPENAI = 'openai';
   const PROVIDER_ANTHROPIC = 'anthropic';
   const PROVIDER_GEMINI = 'gemini';
@@ -107,6 +107,6 @@ class PWATG {
     PWATG::PROVIDER_ANTHROPIC => 'PWATG_Anthropic_Service',
     PWATG::PROVIDER_GEMINI => 'PWATG_Gemini_Service',
   ];
-  
-  
+
+
 }
