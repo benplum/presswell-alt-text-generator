@@ -23,10 +23,11 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
      * @param bool $regenerate_existing Include attachments that already have alt text.
      * @param int  $limit               Optional maximum number of attachments to return.
      * @param bool $force_missing_only  Ignore $regenerate_existing and only return missing alt text.
+     * @param int  $before_id           Only return attachments with a lower ID (0 for no bound).
      *
-     * @return int[]
+     * @return int[] Newest first.
      */
-    public function get_attachment_ids( $regenerate_existing, $limit = 0, $force_missing_only = false ) {
+    public function get_attachment_ids( $regenerate_existing, $limit = 0, $force_missing_only = false, $before_id = 0 ) {
       $args = [
         'post_type'      => 'attachment',
         'post_status'    => 'inherit',
@@ -41,6 +42,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         'fields'         => 'ids',
         'orderby'        => 'ID',
         'order'          => 'DESC',
+        'no_found_rows'  => true,
       ];
 
       $should_filter_missing = $force_missing_only || ! $regenerate_existing;
@@ -61,7 +63,82 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         ];
       }
 
-      return array_map( 'absint', get_posts( $args ) );
+      $before_id = absint( $before_id );
+      $bound     = static function ( $where ) use ( $before_id ) {
+        global $wpdb;
+
+        return $where . $wpdb->prepare( " AND {$wpdb->posts}.ID < %d", $before_id );
+      };
+
+      if ( $before_id > 0 ) {
+        add_filter( 'posts_where', $bound );
+      }
+
+      $query = new WP_Query( $args );
+
+      if ( $before_id > 0 ) {
+        remove_filter( 'posts_where', $bound );
+      }
+
+      return array_map( 'absint', $query->posts );
+    }
+
+    /**
+     * Count the images a bulk run would process.
+     *
+     * @param bool $regenerate_existing Include attachments that already have alt text.
+     *
+     * @return int
+     */
+    public function count_attachments( $regenerate_existing ) {
+      if ( ! $regenerate_existing ) {
+        return $this->count_missing_alt_attachments();
+      }
+
+      $query = new WP_Query(
+        [
+          'post_type'              => 'attachment',
+          'post_status'            => 'inherit',
+          'post_mime_type'         => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ],
+          'posts_per_page'         => 1,
+          'fields'                 => 'ids',
+          'update_post_term_cache' => false,
+          'update_post_meta_cache' => false,
+        ]
+      );
+
+      return (int) $query->found_posts;
+    }
+
+    /**
+     * Process the next batch after a cursor, newest first.
+     *
+     * The cursor is the lowest attachment ID already handled, so the browser only
+     * sends a number rather than the whole ID list (which PHP's max_input_vars
+     * would cut off at about 1,000 entries). Images that fail stay behind the cursor
+     * instead of being retried in a loop.
+     *
+     * @param int  $cursor              Lowest ID already processed (0 to start).
+     * @param int  $batch_size          Number of items to process.
+     * @param bool $regenerate_existing Whether to overwrite existing alt text.
+     *
+     * @return array process_batch() result plus 'next_cursor'.
+     */
+    public function process_next_batch( $cursor, $batch_size, $regenerate_existing ) {
+      $batch_size = max( 1, min( 50, absint( $batch_size ) ) );
+      $ids        = $this->get_attachment_ids( $regenerate_existing, $batch_size, false, $cursor );
+      $result     = $this->process_batch( $ids, 0, $batch_size, $regenerate_existing );
+
+      // When a provider limit halts the batch, the image that hit it is retried next time.
+      $handled_count         = (int) $result['processed'] - ( empty( $result['halted'] ) ? 0 : 1 );
+      $handled               = array_slice( $ids, 0, max( 0, $handled_count ) );
+      $result['next_cursor'] = empty( $handled ) ? absint( $cursor ) : min( $handled );
+
+      // process_batch() only knows this page. The run is done when a provider halts it
+      // or a short page shows nothing older is left.
+      $result['done'] = ! empty( $result['halted'] ) || count( $ids ) < $batch_size;
+
+      return $result;
     }
 
     /** Return how many attachments currently lack alt text. */
@@ -130,6 +207,8 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
           'items'       => [],
           'next_offset' => $offset,
           'done'        => true,
+          'halted'      => false,
+          'missing'     => $this->count_missing_alt_attachments(),
         ];
       }
 

@@ -8,8 +8,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Media-library specific integration points for single-image workflows.
  */
 trait PWATG_Media_Trait {
+  /**
+   * Attachments created during this request, keyed by ID.
+   *
+   * @var array<int, true>
+   */
+  protected $new_upload_ids = [];
+
   /** Wire up WordPress filters/actions for media interactions. */
   protected function construct_media_trait() {
+    add_action( 'add_attachment', [ $this, 'track_new_upload' ] );
     add_filter( 'wp_generate_attachment_metadata', [ $this, 'maybe_generate_on_upload_from_metadata' ], 20, 2 );
     add_action( 'admin_post_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_SINGLE, [ $this, 'handle_single_generation_ajax' ] );
@@ -177,7 +185,20 @@ trait PWATG_Media_Trait {
   }
 
   /**
+   * Remember attachments created in this request, so only real uploads generate alt text.
+   *
+   * @param int $attachment_id Attachment ID.
+   */
+  public function track_new_upload( $attachment_id ) {
+    $this->new_upload_ids[ absint( $attachment_id ) ] = true;
+  }
+
+  /**
    * Run generation when uploads finish and metadata is saved.
+   *
+   * wp_generate_attachment_metadata also runs when thumbnails are regenerated or
+   * metadata is rebuilt, so only attachments created in this request qualify;
+   * otherwise a regeneration run would send every image without alt text to the provider.
    *
    * @param array $metadata      Attachment metadata.
    * @param int   $attachment_id Attachment ID.
@@ -185,7 +206,12 @@ trait PWATG_Media_Trait {
    * @return array
    */
   public function maybe_generate_on_upload_from_metadata( $metadata, $attachment_id ) {
-    $this->maybe_generate_on_upload( $attachment_id );
+    $attachment_id = absint( $attachment_id );
+
+    if ( isset( $this->new_upload_ids[ $attachment_id ] ) ) {
+      unset( $this->new_upload_ids[ $attachment_id ] );
+      $this->maybe_generate_on_upload( $attachment_id );
+    }
 
     return $metadata;
   }
@@ -207,9 +233,25 @@ trait PWATG_Media_Trait {
 
     $current_alt = get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true );
     if ( ! empty( $current_alt ) ) {
+      $this->debug_log( 'Upload skipped: image already has alt text.', [ 'attachment_id' => $attachment_id ] );
       return;
     }
 
+    // Content imports bring their own alt text and can add thousands of images at once.
+    $should_generate = ! ( defined( 'WP_IMPORTING' ) && WP_IMPORTING );
+
+    /**
+     * Filter whether a new upload gets alt text generated right away.
+     *
+     * @param bool $should_generate Whether to generate. False during WordPress imports.
+     * @param int  $attachment_id   Attachment ID.
+     */
+    if ( ! apply_filters( 'pwatg_generate_on_upload', $should_generate, $attachment_id ) ) {
+      $this->debug_log( 'Upload skipped by pwatg_generate_on_upload or an import.', [ 'attachment_id' => $attachment_id ] );
+      return;
+    }
+
+    $this->debug_log( 'Generating alt text for new upload.', [ 'attachment_id' => $attachment_id ] );
     $this->generate_alt_text_for_attachment( $attachment_id, false );
   }
 

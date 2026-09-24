@@ -1,8 +1,8 @@
 === Presswell Alt Text Generator ===
 Contributors: presswell, benplum
 Tags: accessibility, alt text, media library, ai, image seo
-Requires at least: 6.1
-Tested up to: 7.0
+Requires at least: 6.2
+Tested up to: 7.1
 Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,8 +35,10 @@ The Bulk page counts images missing alt text, allows regeneration preferences, a
 **Filters**
 
 * `pwatg_available_services` — Modify the available AI providers
-* `pwatg_available_models` — Modify the available models for each provider
+* `pwatg_available_models` — Modify the available models for a provider (receives the models and the provider slug; the first model is the default)
 * `pwatg_provider_registry` — Map provider slugs to custom service classes
+* `pwatg_generate_on_upload` — Return false to skip generating alt text for a new upload (receives the attachment ID)
+* `pwatg_debug_log_max_bytes` — Size at which the debug log rotates (default 5 MB)
 
 **WP-CLI**
 

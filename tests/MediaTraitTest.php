@@ -114,17 +114,44 @@ class MediaTraitTest extends WP_UnitTestCase {
     delete_option( 'connectors_ai_openai_api_key' );
   }
 
-  public function test_auto_generate_runs_on_upload_filter() {
-    $attachment_id = $this->create_image_attachment();
+  public function test_auto_generate_runs_for_a_new_upload() {
+    $this->enable_auto_generate();
     PWATG_Test_Provider::$response = 'Auto alt text';
 
-    $settings = $this->plugin->get_settings();
-    $settings['auto_generate'] = 'on';
-    update_option( PWATG::SETTINGS_KEY, $settings );
-
-    $this->plugin->maybe_generate_on_upload_from_metadata( [], $attachment_id );
+    // create_image_attachment() inserts the attachment and generates its metadata, like an upload.
+    $attachment_id = $this->create_image_attachment();
 
     $this->assertSame( 'Auto alt text', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  public function test_regenerating_metadata_for_an_existing_image_does_not_call_the_provider() {
+    $attachment_id = $this->create_image_attachment();
+    $this->enable_auto_generate();
+    PWATG_Test_Provider::reset();
+
+    // What thumbnail-regeneration tools do.
+    wp_generate_attachment_metadata( $attachment_id, get_attached_file( $attachment_id ) );
+
+    $this->assertNull( PWATG_Test_Provider::$last_request );
+    $this->assertSame( '', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  public function test_upload_generation_can_be_turned_off_with_a_filter() {
+    $this->enable_auto_generate();
+    add_filter( 'pwatg_generate_on_upload', '__return_false' );
+
+    $attachment_id = $this->create_image_attachment();
+
+    remove_filter( 'pwatg_generate_on_upload', '__return_false' );
+
+    $this->assertNull( PWATG_Test_Provider::$last_request );
+    $this->assertSame( '', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  protected function enable_auto_generate() {
+    $settings = get_option( PWATG::SETTINGS_KEY );
+    $settings['auto_generate'] = 'on';
+    update_option( PWATG::SETTINGS_KEY, $settings );
   }
 
   public function test_media_alt_column_is_injected() {

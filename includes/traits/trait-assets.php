@@ -50,7 +50,38 @@ trait PWATG_Assets_Trait {
       );
     }
 
-    if ( $this->is_settings_page( $hook_suffix ) ) {
+    if ( $this->is_settings_page( $hook_suffix ) && 'debug' === sanitize_key( $this->get_query_param( 'tab' ) ) ) {
+      wp_enqueue_script(
+        PWATG::ASSET_HANDLE_DEBUG_JS,
+        $this->get_asset_url( 'js/debug.js' ),
+        [],
+        PWATG::VERSION,
+        true
+      );
+
+      wp_localize_script(
+        PWATG::ASSET_HANDLE_DEBUG_JS,
+        PWATG::JS_OBJECT_DEBUG,
+        [
+          'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+          'nonce'   => wp_create_nonce( PWATG::NONCE_DEBUG ),
+          'actions' => [
+            'readLog'  => PWATG::AJAX_DEBUG_READ_LOG,
+            'clearLog' => PWATG::AJAX_DEBUG_CLEAR_LOG,
+          ],
+          'i18n'    => [
+            'loading'         => __( 'Loading...', 'presswell-alt-text-generator' ),
+            'requestFailed'   => __( 'Request failed.', 'presswell-alt-text-generator' ),
+            /* translators: %s: date and time logging turns off */
+            'logEnabledUntil' => __( 'Logging is on until %s.', 'presswell-alt-text-generator' ),
+            'logDisabled'     => __( 'Logging is off. Turn it on in Settings.', 'presswell-alt-text-generator' ),
+            'logTruncated'    => __( 'Showing the most recent lines; download for the full log.', 'presswell-alt-text-generator' ),
+            'logEmpty'        => __( 'The log is empty.', 'presswell-alt-text-generator' ),
+            'confirmClear'    => __( 'Delete the debug log?', 'presswell-alt-text-generator' ),
+          ],
+        ]
+      );
+    } elseif ( $this->is_settings_page( $hook_suffix ) ) {
       $settings  = $this->get_settings();
       $model_map = [];
       $services  = array_keys( $this->get_available_services() );

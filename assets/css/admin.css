@@ -98,3 +98,27 @@ tr.is-hidden {
 .wp-list-table .column-pwatg_alt_text .pwatg-inline-action-status {
   color: #a7aaad;
 }
+.pwatg-debug-log-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.pwatg-debug-log-download {
+  margin: 0;
+}
+
+.pwatg-debug-log-output {
+  max-height: 480px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #1d2327;
+  background: #0f1419;
+  color: #e6edf3;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

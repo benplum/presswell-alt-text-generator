@@ -19,8 +19,8 @@ jQuery(function($) {
   const refreshDefaultText = refreshLink.length ? refreshLink.text().trim() : '';
   const pauseButton = $('#pwatg_pause_bulk');
 
-  let ids = [];
-  let offset = 0;
+  // Lowest attachment ID processed so far; the server fetches the next batch below it.
+  let cursor = 0;
   let total = 0;
   let processed = 0;
   let updated = 0;
@@ -185,7 +185,7 @@ jQuery(function($) {
       return;
     }
 
-    if (offset >= total) {
+    if (processed >= total) {
       finish(t('bulkComplete', 'Bulk generation complete.'));
       return;
     }
@@ -196,9 +196,8 @@ jQuery(function($) {
     $.post(ajaxurl, {
       action: ajaxAction,
       nonce: getNonce(),
-      ids: ids,
-      offset: offset,
-      batch_size: batchSize,
+      cursor: cursor,
+      batch_size: Math.max(1, Math.min(batchSize, total - processed)),
       regenerate_existing: regenerateInput.is(':checked') ? 1 : 0,
       run_test: runTestInput.is(':checked') ? 1 : 0
     }).done(function(response) {
@@ -208,7 +207,7 @@ jQuery(function($) {
         return;
       }
 
-      offset = response.data.next_offset;
+      cursor = response.data.next_cursor;
       processed += response.data.processed;
       updated += response.data.updated;
       failed += response.data.failed;
@@ -295,9 +294,8 @@ jQuery(function($) {
         return;
       }
 
-      ids = response.data.ids || [];
       total = response.data.total || 0;
-      offset = 0;
+      cursor = 0;
       processed = 0;
       updated = 0;
       failed = 0;

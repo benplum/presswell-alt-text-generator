@@ -62,27 +62,22 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $this->assertFalse( get_transient( PWATG::RATE_LIMIT_TRANSIENT ) );
   }
 
-  public function test_bulk_init_ajax_returns_attachment_ids() {
-    $attachment_id = $this->create_image_attachment();
+  public function test_bulk_init_ajax_returns_the_total_without_an_id_list() {
+    $this->create_image_attachment();
     $_POST = [
       'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
     ];
 
-    try {
-      $this->_handleAjax( PWATG::AJAX_INIT_BULK );
-    } catch ( WPAjaxDieContinueException $e ) {
-      // Expected.
-    }
+    $response = $this->ajax( PWATG::AJAX_INIT_BULK );
 
-    $response = json_decode( $this->_last_response, true );
     $this->assertTrue( $response['success'] );
-    $this->assertSame( [ $attachment_id ], $response['data']['ids'] );
     $this->assertSame( 1, $response['data']['total'] );
+    $this->assertArrayNotHasKey( 'ids', $response['data'], 'Posting the list back would hit max_input_vars.' );
   }
 
   public function test_bulk_init_ajax_run_test_limits_to_missing_subset() {
     $attachments = [];
-    for ( $i = 0; $i < 6; $i++ ) {
+    for ( $i = 0; $i < 7; $i++ ) {
       $attachments[] = $this->create_image_attachment();
     }
 
@@ -94,17 +89,21 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
       'regenerate_existing'  => 1,
     ];
 
-    try {
-      $this->_handleAjax( PWATG::AJAX_INIT_BULK );
-    } catch ( WPAjaxDieContinueException $e ) {
-      // Expected.
-    }
+    $response = $this->ajax( PWATG::AJAX_INIT_BULK );
 
-    $response = json_decode( $this->_last_response, true );
     $this->assertTrue( $response['success'] );
     $this->assertSame( 5, $response['data']['total'] );
-    $this->assertCount( 5, $response['data']['ids'] );
-    $this->assertNotContains( $attachments[0], $response['data']['ids'] );
+  }
+
+  public function test_bulk_counts_every_image_when_regenerating_existing() {
+    $first = $this->create_image_attachment();
+    $this->create_image_attachment();
+    update_post_meta( $first, PWATG::META_KEY_ALT_TEXT, 'existing alt' );
+
+    $service = new PWATG_Bulk_Service( $this->plugin );
+
+    $this->assertSame( 1, $service->count_attachments( false ) );
+    $this->assertSame( 2, $service->count_attachments( true ) );
   }
 
   public function test_bulk_init_ajax_respects_rate_limit_lock() {
@@ -128,26 +127,83 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $attachment_id = $this->create_image_attachment();
     $_POST = [
       'nonce'              => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
-      'ids'                => [ $attachment_id ],
-      'offset'             => 0,
+      'cursor'             => 0,
       'batch_size'         => 1,
       'regenerate_existing'=> 0,
     ];
 
     PWATG_Test_Provider::$response = 'Batch alt text';
 
-    try {
-      $this->_handleAjax( PWATG::AJAX_GENERATE_BULK );
-    } catch ( WPAjaxDieContinueException $e ) {
-      // Expected.
-    }
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
 
-    $response = json_decode( $this->_last_response, true );
     $this->assertTrue( $response['success'] );
     $this->assertSame( 1, $response['data']['processed'] );
     $this->assertSame( 1, $response['data']['updated'] );
     $this->assertSame( 0, $response['data']['failed'] );
+    $this->assertSame( $attachment_id, $response['data']['next_cursor'] );
     $this->assertSame( 'Batch alt text', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  public function test_bulk_cursor_pages_through_every_image_newest_first() {
+    $ids = [];
+    for ( $i = 0; $i < 7; $i++ ) {
+      $ids[] = $this->create_image_attachment();
+    }
+
+    $service  = new PWATG_Bulk_Service( $this->plugin );
+    $cursor   = 0;
+    $seen     = [];
+    $requests = 0;
+
+    do {
+      $result = $service->process_next_batch( $cursor, 3, false );
+      $seen   = array_merge( $seen, wp_list_pluck( $result['items'], 'id' ) );
+      $cursor = $result['next_cursor'];
+      $requests++;
+    } while ( empty( $result['done'] ) && $requests < 10 );
+
+    rsort( $ids );
+    $this->assertSame( $ids, $seen, 'Each image is processed once, newest first.' );
+    $this->assertSame( 3, $requests );
+  }
+
+  public function test_bulk_generate_ajax_reports_a_halt_and_retries_that_image_next_time() {
+    $older = $this->create_image_attachment();
+    $newer = $this->create_image_attachment();
+
+    PWATG_Test_Provider::$response = new WP_Error( 'pwatg_rate_limited', 'Slow down', [ 'provider' => 'openai', 'retry_after' => 120 ] );
+
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'cursor'     => 0,
+      'batch_size' => 5,
+    ];
+
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
+
+    $this->assertTrue( $response['data']['halted'], 'The browser is told the run stopped.' );
+    $this->assertSame( 'pwatg_rate_limited', $response['data']['halt_code'] );
+    $this->assertSame( 0, $response['data']['next_cursor'], 'The rate-limited image is not skipped.' );
+    $this->assertSame( [ $newer ], wp_list_pluck( $response['data']['items'], 'id' ) );
+    $this->assertSame( '', get_post_meta( $older, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  /**
+   * Run an AJAX action and return the decoded JSON response.
+   */
+  protected function ajax( $action ) {
+    try {
+      $this->_handleAjax( $action );
+    } catch ( WPAjaxDieContinueException $e ) {
+      // Expected.
+    } catch ( WPAjaxDieStopException $e ) {
+      // Expected for error responses.
+    }
+
+    $response = json_decode( $this->_last_response, true );
+    $this->_last_response = '';
+
+    return $response;
   }
 
   protected function simulate_rate_limit_lock() {

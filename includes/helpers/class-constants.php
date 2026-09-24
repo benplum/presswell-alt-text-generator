@@ -65,7 +65,21 @@ class PWATG {
   const META_KEY_ALT_TEXT = '_wp_attachment_image_alt';
   const META_KEY_LAST_GENERATED = '_pwatg_last_generated';
 
-  const DEBUG_LOG_FILENAME = 'debug-pwad.log';
+  // Debug log
+  const DEBUG_LOG_LEGACY_FILENAME = 'debug-pwad.log';
+  const DEBUG_LOG_DIR = 'pwatg-logs';
+  const DEBUG_LOG_MAX_BYTES = 5242880;
+  const DEBUG_LOG_TTL = 604800;
+  const OPTION_DEBUG_LOG_TOKEN = 'pwatg_debug_log_token';
+  const OPTION_DEBUG_LOG_ENABLED_AT = 'pwatg_debug_log_enabled_at';
+  const OPTION_DEBUG_LOG_EXPIRED = 'pwatg_debug_log_expired';
+  const AJAX_DEBUG_READ_LOG = 'pwatg_debug_read_log';
+  const AJAX_DEBUG_CLEAR_LOG = 'pwatg_debug_clear_log';
+  const ACTION_DOWNLOAD_LOG = 'pwatg_download_log';
+  const NONCE_DEBUG = 'pwatg_debug';
+  const NONCE_DOWNLOAD_LOG = 'pwatg_download_log';
+  const ASSET_HANDLE_DEBUG_JS = 'pwatg-js-debug';
+  const JS_OBJECT_DEBUG = 'pwatgDebugData';
 
   // Field Keys
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';

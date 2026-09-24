@@ -60,22 +60,24 @@ trait PWATG_Bulk_Trait {
 
     $run_test            = ! empty( $_POST['run_test'] );
     $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
-    $limit               = $run_test ? 5 : 0;
-    $ids                 = $this->get_bulk_service()->get_attachment_ids( $regenerate_existing, $limit, $run_test );
+    $total               = $this->get_bulk_service()->count_attachments( $regenerate_existing );
+
+    if ( $run_test ) {
+      $total = min( 5, $total );
+    }
 
     $this->debug_log(
-      'Bulk init request prepared attachment IDs.',
+      'Bulk run started.',
       [
         'run_test'            => (bool) $run_test,
         'regenerate_existing' => (bool) $regenerate_existing,
-        'total'               => count( $ids ),
+        'total'               => $total,
       ]
     );
 
     wp_send_json_success(
       [
-        'ids'   => $ids,
-        'total' => count( $ids ),
+        'total' => $total,
       ]
     );
   }
@@ -99,45 +101,51 @@ trait PWATG_Bulk_Trait {
       );
     }
 
-    $raw_ids             = isset( $_POST['ids'] ) ? array_values( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['ids'] ) ) ) ) : [];
-    $offset              = isset( $_POST['offset'] ) ? absint( wp_unslash( $_POST['offset'] ) ) : 0;
+    $cursor              = isset( $_POST['cursor'] ) ? absint( wp_unslash( $_POST['cursor'] ) ) : 0;
     $batch_size          = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
     $run_test            = ! empty( $_POST['run_test'] );
     $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
 
     if ( $run_test ) {
-      $raw_ids = array_slice( $raw_ids, 0, 5 );
+      $batch_size = min( 5, $batch_size );
     }
 
-    $results = $this->get_bulk_service()->process_batch( $raw_ids, $offset, $batch_size, $regenerate_existing );
+    $results = $this->get_bulk_service()->process_next_batch( $cursor, $batch_size, $regenerate_existing );
     $this->missing_alt_count_cache = $results['missing'];
 
     $this->debug_log(
-      'Bulk generation batch processed.',
+      empty( $results['halted'] ) ? 'Bulk generation batch processed.' : 'Bulk run halted by a provider limit.',
       [
-        'offset'              => $offset,
+        'cursor'              => $cursor,
         'batch_size'          => $batch_size,
         'run_test'            => (bool) $run_test,
         'regenerate_existing' => (bool) $regenerate_existing,
         'processed'           => isset( $results['processed'] ) ? (int) $results['processed'] : 0,
         'updated'             => isset( $results['updated'] ) ? (int) $results['updated'] : 0,
         'failed'              => isset( $results['failed'] ) ? (int) $results['failed'] : 0,
-        'next_offset'         => isset( $results['next_offset'] ) ? (int) $results['next_offset'] : 0,
+        'next_cursor'         => (int) $results['next_cursor'],
         'done'                => ! empty( $results['done'] ),
       ]
     );
 
-    wp_send_json_success(
-      [
-        'processed'   => $results['processed'],
-        'updated'     => $results['updated'],
-        'failed'      => $results['failed'],
-        'items'       => $results['items'],
-        'next_offset' => $results['next_offset'],
-        'done'        => $results['done'],
-        'missing'     => $results['missing'],
-      ]
-    );
+    $payload = [
+      'processed'   => $results['processed'],
+      'updated'     => $results['updated'],
+      'failed'      => $results['failed'],
+      'items'       => $results['items'],
+      'next_cursor' => $results['next_cursor'],
+      'done'        => $results['done'],
+      'halted'      => ! empty( $results['halted'] ),
+      'missing'     => $results['missing'],
+    ];
+
+    foreach ( [ 'halt_code', 'halt_reason', 'halt_retry_after' ] as $key ) {
+      if ( isset( $results[ $key ] ) ) {
+        $payload[ $key ] = $results[ $key ];
+      }
+    }
+
+    wp_send_json_success( $payload );
   }
 
   /** AJAX: scan for attachments that are missing alt text. */

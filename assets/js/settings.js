@@ -7,6 +7,10 @@
   const coreConnectorSelect = document.querySelector('select[name="' + optionKey + '[core_connector]"]');
   const pluginApiKeyGroup = document.querySelector('.pwatg-plugin-api-key-group');
   const coreConnectorWrap = document.querySelector('.pwatg-core-connector-wrap');
+  if (!serviceSelect || !modelSelect) {
+    return;
+  }
+
   const serviceRow = serviceSelect.closest('tr');
   const apiKeyRow = pluginApiKeyGroup ? pluginApiKeyGroup.closest('tr') : null;
   const coreConnectorRow = coreConnectorWrap ? coreConnectorWrap.closest('tr') : null;
@@ -16,10 +20,6 @@
   const currentModel = data.currentModel || '';
   const hasCoreConnectors = !!data.hasCoreConnectors;
   const coreConnectorServiceMap = data.coreConnectorServiceMap || {};
-
-  if (!serviceSelect || !modelSelect) {
-    return;
-  }
 
   function getSelectedConnectorSource() {
     if (!connectorSourceInputs.length) {
