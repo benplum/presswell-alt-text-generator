@@ -737,10 +737,16 @@ trait PWATG_Providers_Trait {
       return $alt_text;
     }
 
-    $cut   = mb_substr( $alt_text, 0, $limit );
-    $space = mb_strrpos( $cut, ' ' );
+    $cut = mb_substr( $alt_text, 0, $limit );
 
-    return rtrim( false !== $space && $space > $limit * 0.6 ? mb_substr( $cut, 0, $space ) : $cut, " ,;:-" );
+    // Drop the partial last word, unless that would lose too much (one very long word).
+    // A regex rather than mb_strrpos(), which WordPress doesn't polyfill without mbstring.
+    $trimmed = preg_replace( '/\s+\S*$/u', '', $cut );
+    if ( is_string( $trimmed ) && mb_strlen( $trimmed ) > $limit * 0.6 ) {
+      $cut = $trimmed;
+    }
+
+    return rtrim( $cut, " ,;:-" );
   }
 
   protected function request_openai_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {

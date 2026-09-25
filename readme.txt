@@ -15,16 +15,23 @@ Presswell Alt Text Generator helps teams reduce accessibility backlog by generat
 
 **Features**
 
-* Supports OpenAI, Anthropic Claude, and Google Gemini multimodal models
-* Generates alt text for individual images in the Media Library and media modal
+* Supports OpenAI, Anthropic Claude, and Google Gemini, with their own API keys or through WordPress AI Connectors
+* On WordPress 7.0+, can send requests through the WordPress AI Client, so the plugin stores no key
+* Generates alt text for individual images in the Media Library, the media modal, and the Image block
+* Generates alt text for new uploads automatically (optional)
 * Processes missing-alt backlogs in batches with a dedicated bulk queue
-* Handles provider rate limits with automatic cooldown locks
-* Adds a Media Library column with quick generate/regenerate actions
+* Writes alt text in your site's language
+* Restores the previous alt text if a regeneration isn't an improvement
+* Handles provider rate limits and quota errors with automatic pauses
 * Provides a customizable prompt seed for output consistency
 
 ***Media Library Tools***
 
-Inline actions let you generate or regenerate alt text directly from each image row. When an image has no alt text, the column displays a "Generate Alt Text" link that triggers the AJAX workflow and replaces itself with the result.
+An Alt Text column shows each image's alt text, and a "Generate Alt Text" or "Regenerate Alt Text" row action updates it in place. The same button appears in the media modal and on the attachment edit screen, along with "Restore previous alt text" after a regeneration.
+
+***Block Editor***
+
+Select an Image block to find an Alt Text Generator panel in its sidebar. It fills in the block's alt text and updates the image in the Media Library.
 
 ***Bulk Generator***
 
@@ -41,6 +48,11 @@ The Bulk page counts images missing alt text, allows regeneration preferences, a
 * `pwatg_debug_log_max_bytes` — Size at which the debug log rotates (default 5 MB)
 * `pwatg_image_max_dimension` — Long edge, in pixels, of the image copy sent to the provider (default 1024)
 * `pwatg_alt_text_language` — Language the alt text is written in (defaults to the site language; return an empty string to leave it to the model)
+* `pwatg_include_filename_in_prompt` — Return false to leave the image's filename out of the prompt (receives the attachment ID)
+* `pwatg_use_wp_ai_client` — Return false to call the provider directly instead of through the WordPress AI Client in Core mode (receives the provider ID)
+* `pwatg_core_connector_service_map` — Map WordPress AI Connector IDs to this plugin's provider slugs
+* `pwatg_service_connector_candidates` — Connector IDs checked for each provider's API key
+* `pwatg_debug_log_filename` — Filename of the private debug log
 
 **WP-CLI**
 
@@ -70,19 +82,20 @@ Install via the WordPress plugin installer, or manually upload the plugin direct
 **Configuration**
 
 1. Activate the plugin.
-2. Visit *Settings -> Alt Text Generator* to enter your API key and choose a model.
-3. (Optional) Enable auto-generate-on-upload if you want every new image to receive alt text automatically.
-4. Use the Bulk tool under *Media -> Alt Text Bulk Generator* or inline Media Library actions.
+2. Visit *Settings -> Alt Text Generator*. Choose *Core* to use a provider set up in *Settings -> Connectors* (WordPress 7.0+), or *Plugin* to enter an API key and choose a model.
+3. Use *Test Connection* to confirm the provider responds.
+4. (Optional) Turn *Generate on Upload* on or off.
+5. Use the bulk tool under *Media -> Alt Text Generator*, or the Media Library and Image block actions.
 
 == Frequently Asked Questions ==
 
 = Which providers are supported? =
 
-OpenAI (GPT-4.1, GPT-4o), Anthropic Claude (3.5 Haiku/Sonnet, 3 Opus), and Google Gemini (2.0 Flash, 1.5 Flash/Pro). You can extend the provider registry to add more.
+OpenAI (GPT-4.1 and GPT-4o, including the mini models), Anthropic Claude (Haiku 4.5, Sonnet 5, Opus 5.5), and Google Gemini (2.5 Flash, Flash-Lite, and Pro). On WordPress 7.0+, any provider connected to the WordPress AI Client can be used in Core mode. The `pwatg_available_models` filter changes the model list, and the `pwatg_provider_registry` filter adds provider classes.
 
 = Where are API keys stored? =
 
-Keys are stored in the site options table. They are used only when calling the selected provider from your server.
+In Core mode, keys are managed by WordPress in *Settings -> Connectors*. In Plugin mode, keys are stored in the site options table and sent only to the selected provider, from your server. Saved keys are never printed in the settings page, and they are removed when the plugin is deleted.
 
 = Can I regenerate specific images without affecting others? =
 
@@ -98,21 +111,21 @@ Yes. Use `wp pwatg network-bulk-generate` to process all sites in the network, o
 
 = How does rate limiting work? =
 
-If a provider responds with a retry-after header, the plugin sets a transient lock and pauses both single and bulk runs until the cooldown expires.
+When a provider reports a rate limit, the plugin pauses requests to that provider for the time it asks for (or a few minutes). An out-of-credit or quota error pauses it for an hour. Bulk runs stop and say why, and the image that hit the limit is retried when you continue.
 
 == Privacy ==
 
-This plugin sends image-derived payloads to the AI provider you choose when generating alt text (OpenAI, Anthropic, or Google Gemini). API keys are stored in WordPress options on your site and used only for outbound provider requests initiated by your server.
+This plugin sends images to the AI provider you choose when generating alt text (OpenAI, Anthropic, or Google Gemini). Generation happens when you ask for it, and for new uploads when *Generate on Upload* is on. In Plugin mode, API keys are stored in WordPress options on your site and used only for requests your server sends to that provider.
 
 == External Services ==
 
-This plugin connects to external AI services only when you use alt text generation features or test provider connectivity. Only the provider selected in plugin settings is contacted for a given request. This plugin sends the follow data:
+This plugin connects to an external AI service only when alt text is generated (on request, or for new uploads when *Generate on Upload* is on) or when you use Test Connection. Only the provider selected in the plugin settings is contacted. In Core mode on WordPress 7.0+, the request is sent through the WordPress AI Client using the connection set up in *Settings -> Connectors*. This plugin sends the following data:
 
-* API key (in Authorization header)
-* Selected model name
-* Prompt text (including your prompt seed and filename context)
-    * For alt-text generation: image MIME type and image binary content encoded as base64
-    * For Test Connection: a short text prompt ("Reply with: OK")
+* The API key, in the provider's authentication header
+* The selected model name
+* The prompt: your prompt seed, the site language, and a short plain-text version of the image's filename (leave it out with the `pwatg_include_filename_in_prompt` filter)
+* For alt text generation: a copy of the image, resized to about 1024 pixels and converted to JPEG when the provider doesn't accept its format, encoded as base64
+* For Test Connection: a short text prompt ("Reply with: OK")
 
 = OpenAI API =
 

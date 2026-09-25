@@ -9,7 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 trait PWATG_Assets_Trait {
   /**
-   * Retrieve a query parameter in a way that works in both web and CLI contexts.
+   * Retrieve a sanitized query parameter in a way that works in both web and CLI contexts.
+   *
+   * Only used to decide which screen or tab is showing, so no nonce is involved.
    *
    * @param string $key Query string key.
    *
@@ -19,10 +21,11 @@ trait PWATG_Assets_Trait {
     $value = filter_input( INPUT_GET, $key, FILTER_UNSAFE_RAW );
 
     if ( null === $value || false === $value ) {
-      $value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : '';
+      // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only screen detection.
+      $value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
     }
 
-    return is_scalar( $value ) ? (string) $value : '';
+    return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : '';
   }
 
   /** Hook asset loaders into WordPress. */
