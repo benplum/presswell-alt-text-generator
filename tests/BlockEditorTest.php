@@ -19,7 +19,7 @@ class BlockEditorTest extends WP_UnitTestCase {
     $settings['api_keys']['openai'] = 'sk-test';
     $settings['connector_source']   = 'plugin';
     $settings['auto_generate']      = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     PWATG_Test_Provider::reset();
     PWATG_Test_Provider::$response = 'Block alt text';

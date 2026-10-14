@@ -51,7 +51,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
             'anthropic-version' => '2023-06-01',
           ],
           'body'    => wp_json_encode( $body ),
-          'timeout' => 45,
+          'timeout' => self::ALT_TEXT_TIMEOUT,
         ]
       );
 
@@ -64,7 +64,7 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
         return $data;
       }
 
-      return self::extract_text_block( $data, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ) );
+      return self::extract_text_block( $data, 'pwatg_empty_alt', __( 'AI response did not include alt text.', 'presswell-alt-text-generator' ), $model );
     }
 
     /** Request a quick text response to validate credentials/config. */
@@ -112,13 +112,20 @@ if ( ! class_exists( 'PWATG_Anthropic_Service' ) ) {
     /**
      * Traverse the response blocks to find the textual output.
      *
+     * @param array  $data          Decoded response.
+     * @param string $error_code    Error code when there is no text.
+     * @param string $error_message Error message when there is no text.
+     * @param string $model         Model ID, for the debug log.
+     *
      * @return string|WP_Error
      */
-    private static function extract_text_block( array $data, $error_code, $error_message ) {
+    private static function extract_text_block( array $data, $error_code, $error_message, $model = '' ) {
+      $truncated = isset( $data['stop_reason'] ) && 'max_tokens' === $data['stop_reason'];
+
       if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
         foreach ( $data['content'] as $block ) {
           if ( isset( $block['type'] ) && 'text' === $block['type'] && isset( $block['text'] ) ) {
-            return trim( wp_strip_all_tags( (string) $block['text'] ) );
+            return self::finalize_text( $block['text'], $truncated, $model );
           }
         }
       }

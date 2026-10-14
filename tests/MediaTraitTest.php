@@ -60,7 +60,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $settings['core_connector'] = 'openai';
     $settings['api_keys']['openai'] = '';
     $settings['api_key'] = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     update_option( 'connectors_ai_openai_api_key', 'connector-openai-key' );
 
@@ -81,7 +81,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $settings['service'] = 'openai';
     $settings['api_keys']['openai'] = 'plugin-openai-key';
     $settings['api_key'] = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     update_option( 'connectors_ai_openai_api_key', 'core-openai-key' );
 
@@ -102,7 +102,7 @@ class MediaTraitTest extends WP_UnitTestCase {
     $settings['service'] = 'openai';
     $settings['api_keys']['openai'] = 'plugin-openai-key';
     $settings['api_key'] = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     update_option( 'connectors_ai_openai_api_key', 'core-openai-key' );
 
@@ -149,9 +149,9 @@ class MediaTraitTest extends WP_UnitTestCase {
   }
 
   protected function enable_auto_generate() {
-    $settings = get_option( PWATG::SETTINGS_KEY );
+    $settings = pwatg_test_get_option( PWATG::SETTINGS_KEY );
     $settings['auto_generate'] = 'on';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
   }
 
   public function test_media_alt_column_is_injected() {
@@ -190,6 +190,22 @@ class MediaTraitTest extends WP_UnitTestCase {
     $this->assertStringContainsString( 'Regenerate Alt Text', $actions[ PWATG::FIELD_GENERATE_SINGLE ] );
   }
 
+  public function test_generate_actions_are_buttons_not_nonce_links() {
+    wp_set_current_user( self::factory()->user->create( [ 'role' => 'editor' ] ) );
+    $attachment_id = $this->create_image_attachment();
+
+    $row   = $this->plugin->add_media_row_action( [], get_post( $attachment_id ) )[ PWATG::FIELD_GENERATE_SINGLE ];
+    $modal = $this->plugin->add_media_modal_action_field( [], get_post( $attachment_id ) )[ PWATG::FIELD_GENERATE_SINGLE ]['html'];
+
+    foreach ( [ 'row action' => $row, 'modal field' => $modal ] as $label => $html ) {
+      $this->assertStringContainsString( '<button type="button"', $html, $label );
+      $this->assertStringContainsString( 'data-attachment-id="' . $attachment_id . '"', $html, $label );
+      $this->assertMatchesRegularExpression( '/data-nonce="[a-f0-9]{10}"/', $html, $label );
+      $this->assertStringNotContainsString( 'href=', $html, $label . ': nothing to follow with a GET.' );
+      $this->assertStringNotContainsString( 'admin-post.php', $html, $label );
+    }
+  }
+
   public function test_media_alt_column_marks_missing_alt_text() {
     $user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
     wp_set_current_user( $user_id );
@@ -210,7 +226,8 @@ class MediaTraitTest extends WP_UnitTestCase {
     $defaults['api_keys']['anthropic'] = '';
     $defaults['api_keys']['gemini'] = '';
     $defaults['auto_generate'] = '';
-    update_option( PWATG::SETTINGS_KEY, $defaults );
+    $defaults['connector_source'] = 'plugin';
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 
   protected function create_image_attachment() {

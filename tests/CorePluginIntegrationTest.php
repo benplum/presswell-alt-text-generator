@@ -16,7 +16,7 @@ class CorePluginIntegrationTest extends WP_UnitTestCase {
 
     $defaults = $this->plugin->get_default_settings();
     $defaults['api_keys']['openai'] = 'sk-test';
-    update_option( PWATG::SETTINGS_KEY, $defaults );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $defaults );
 
     unset( $_GET['page'] );
     unset( $_GET['post'] );
@@ -50,7 +50,7 @@ class CorePluginIntegrationTest extends WP_UnitTestCase {
     $this->assertNotFalse( has_action( 'wp_ajax_' . PWATG::AJAX_SCAN_MISSING, [ $this->plugin, 'handle_bulk_scan_missing_ajax' ] ) );
 
     $this->assertNotFalse( has_filter( 'wp_generate_attachment_metadata', [ $this->plugin, 'maybe_generate_on_upload_from_metadata' ] ) );
-    $this->assertNotFalse( has_action( 'admin_post_' . PWATG::AJAX_GENERATE_SINGLE, [ $this->plugin, 'handle_single_generation' ] ) );
+    $this->assertFalse( has_action( 'admin_post_' . PWATG::AJAX_GENERATE_SINGLE ), 'Generation changes data, so it is AJAX (POST) only, never a GET link.' );
     $this->assertNotFalse( has_action( 'wp_ajax_' . PWATG::AJAX_GENERATE_SINGLE, [ $this->plugin, 'handle_single_generation_ajax' ] ) );
     $this->assertNotFalse( has_filter( 'media_row_actions', [ $this->plugin, 'add_media_row_action' ] ) );
     $this->assertNotFalse( has_filter( 'attachment_fields_to_edit', [ $this->plugin, 'add_media_modal_action_field' ] ) );

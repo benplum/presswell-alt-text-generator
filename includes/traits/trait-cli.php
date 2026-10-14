@@ -161,11 +161,25 @@ trait PWATG_CLI_Trait {
       $site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
     }
 
+    $basename         = plugin_basename( Presswell_Alt_Text_Generator::PLUGIN_FILE );
+    $check_activation = $this->is_loaded_as_regular_plugin();
+
     $totals = [ 'sites' => 0, 'processed' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0, 'selected' => 0 ];
     $sites  = [];
     $halted = false;
 
     foreach ( array_values( array_unique( array_map( 'absint', (array) $site_ids ) ) ) as $site_id ) {
+      // Sites that haven't activated the plugin haven't opted in to paying for alt text.
+      if ( $check_activation && ! $this->is_plugin_active_on_site( $site_id, $basename ) ) {
+        $sites[ $site_id ] = [
+          'ok'       => true,
+          'error'    => 'Skipped: the plugin is not active on this site.',
+          'selected' => 0,
+          'url'      => (string) get_home_url( $site_id, '/' ),
+        ];
+        continue;
+      }
+
       switch_to_blog( $site_id );
       $site_result          = $this->run_bulk_generate_cli( $assoc_args );
       $site_result['url']   = (string) home_url( '/' );
@@ -188,6 +202,50 @@ trait PWATG_CLI_Trait {
     }
 
     return [ 'ok' => true, 'error' => '', 'sites' => $sites, 'totals' => $totals, 'halted' => $halted ];
+  }
+
+  /**
+   * Count images missing alt text on the current site.
+   *
+   * @return int
+   */
+  public function run_count_missing_cli() {
+    return (int) $this->get_bulk_service()->count_missing_alt_attachments();
+  }
+
+  /**
+   * Whether this plugin was loaded from the plugins directory, so activation applies.
+   *
+   * Loaded as a must-use plugin (or by custom code), it runs on every site.
+   *
+   * @return bool
+   */
+  protected function is_loaded_as_regular_plugin() {
+    $file = wp_normalize_path( Presswell_Alt_Text_Generator::PLUGIN_FILE );
+
+    return 0 === strpos( $file, trailingslashit( wp_normalize_path( WP_PLUGIN_DIR ) ) );
+  }
+
+  /**
+   * Whether a plugin is active on a site, either network-wide or on the site itself.
+   *
+   * @param int    $site_id  Site ID.
+   * @param string $basename Plugin basename, e.g. presswell-alt-text-generator/presswell-alt-text-generator.php.
+   *
+   * @return bool
+   */
+  protected function is_plugin_active_on_site( $site_id, $basename ) {
+    if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
+      require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    }
+
+    if ( is_plugin_active_for_network( $basename ) ) {
+      return true;
+    }
+
+    $active = get_blog_option( absint( $site_id ), 'active_plugins', [] );
+
+    return is_array( $active ) && in_array( $basename, $active, true );
   }
 
   /**

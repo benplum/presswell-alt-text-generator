@@ -168,8 +168,7 @@ function pwatg_register_cli_commands() {
   WP_CLI::add_command(
     'pwatg count-missing',
     static function () {
-      $bulk_service = new PWATG_Bulk_Service( presswell_alt_text_generator() );
-      WP_CLI::log( (string) $bulk_service->count_missing_alt_attachments() );
+      WP_CLI::log( (string) presswell_alt_text_generator()->run_count_missing_cli() );
     },
     [
       'shortdesc' => 'Count image attachments that are currently missing alt text.',

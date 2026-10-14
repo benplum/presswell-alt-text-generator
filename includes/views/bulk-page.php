@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @var string $rate_limit_message Optional warning string.
  */
 ?>
-<div class="wrap">
+<div class="wrap pwatg-bulk-page">
   <?php wp_nonce_field( PWATG::NONCE_GENERATE_BULK, 'pwatg_bulk_nonce', false ); ?>
   <?php
   // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Local template variable from extracted view context.

@@ -10,6 +10,7 @@ if ( file_exists( $composer_autoload ) ) {
 
 require_once __DIR__ . '/helpers/class-pwatg-test-provider.php';
 require_once __DIR__ . '/helpers/lock-functions.php';
+require_once __DIR__ . '/helpers/settings-functions.php';
 require_once __DIR__ . '/helpers/class-pwatg-fake-prompt-builder.php';
 
 if ( ! defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' ) ) {

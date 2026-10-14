@@ -2,7 +2,6 @@
 
 .pwatg-progress-wrap {
   display: none;
-  max-width: 640px;
   margin-top: 14px;
 }
 
@@ -29,7 +28,6 @@
 
 .pwatg-results-table {
   display: none;
-  max-width: 1000px;
   margin-top: 16px;
 }
 

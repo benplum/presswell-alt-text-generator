@@ -16,7 +16,7 @@ class CliTest extends WP_UnitTestCase {
     $settings['api_keys']['openai'] = 'sk-test';
     $settings['connector_source']   = 'plugin';
     $settings['auto_generate']      = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     PWATG_Test_Provider::reset();
     PWATG_Test_Provider::$response = 'CLI alt text';
@@ -136,6 +136,14 @@ class CliTest extends WP_UnitTestCase {
     $failed = $this->plugin->run_generate_cli( self::factory()->post->create() );
     $this->assertFalse( $failed['ok'] );
     $this->assertSame( 'pwatg_invalid_attachment', $failed['code'] );
+  }
+
+  public function test_count_missing_uses_the_shared_bulk_service() {
+    $this->create_image();
+    $with_alt = $this->create_image();
+    update_post_meta( $with_alt, PWATG::META_KEY_ALT_TEXT, 'Written by a person' );
+
+    $this->assertSame( 1, $this->plugin->run_count_missing_cli() );
   }
 
   public function test_network_command_requires_multisite() {

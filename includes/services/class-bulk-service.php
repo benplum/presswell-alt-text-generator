@@ -7,6 +7,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
   /** Handles batch querying and processing for bulk runs. */
   class PWATG_Bulk_Service {
+    /** Images per batch the bulk screen requests. */
+    const DEFAULT_BATCH_SIZE = 5;
+
+    /** Most images one batch request may process. */
+    const MAX_BATCH_SIZE = 50;
+
     /** @var Presswell_Alt_Text_Generator */
     protected $plugin;
 
@@ -112,25 +118,26 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
      * would cut off at about 1,000 entries). Images that fail stay behind the cursor
      * instead of being retried in a loop.
      *
-     * @param int  $cursor              Lowest ID already processed (0 to start).
-     * @param int  $batch_size          Number of items to process.
-     * @param bool $regenerate_existing Whether to overwrite existing alt text.
+     * @param int           $cursor              Lowest ID already processed (0 to start).
+     * @param int           $batch_size          Number of items to process.
+     * @param bool          $regenerate_existing Whether to overwrite existing alt text.
+     * @param callable|null $before_item         See process_batch().
      *
-     * @return array process_batch() result plus 'next_cursor'.
+     * @return array process_batch() result plus 'next_cursor' and 'done'.
      */
-    public function process_next_batch( $cursor, $batch_size, $regenerate_existing ) {
-      $batch_size = max( 1, min( 50, absint( $batch_size ) ) );
+    public function process_next_batch( $cursor, $batch_size, $regenerate_existing, $before_item = null ) {
+      $batch_size = max( 1, min( self::MAX_BATCH_SIZE, absint( $batch_size ) ) );
       $ids        = $this->get_attachment_ids( $regenerate_existing, $batch_size, false, $cursor );
-      $result     = $this->process_batch( $ids, 0, $batch_size, $regenerate_existing );
+      $result     = $this->process_batch( $ids, $regenerate_existing, $before_item );
 
       // When a provider limit halts the batch, the image that hit it is retried next time.
       $handled_count         = (int) $result['processed'] - ( empty( $result['halted'] ) ? 0 : 1 );
       $handled               = array_slice( $ids, 0, max( 0, $handled_count ) );
       $result['next_cursor'] = empty( $handled ) ? absint( $cursor ) : min( $handled );
 
-      // process_batch() only knows this page. The run is done when a provider halts it
-      // or a short page shows nothing older is left.
-      $result['done'] = ! empty( $result['halted'] ) || count( $ids ) < $batch_size;
+      // The run is done when a provider halts it, it loses its lock, or a short page
+      // shows nothing older is left.
+      $result['done'] = ! empty( $result['halted'] ) || ! empty( $result['stopped'] ) || count( $ids ) < $batch_size;
 
       return $result;
     }
@@ -172,35 +179,18 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
     }
 
     /**
-     * Process a slice of attachment IDs and return structured progress data.
+     * Process a page of attachment IDs and return structured progress data.
      *
-     * @param array $ids                  Full ID list for the run.
-     * @param int   $offset               Current offset pointer.
-     * @param int   $batch_size           Number of items to process.
-     * @param bool  $regenerate_existing  Whether to overwrite existing alt text.
+     * @param int[]         $ids                 Attachment IDs to process, in order.
+     * @param bool          $regenerate_existing Whether to overwrite existing alt text.
+     * @param callable|null $before_item         Called with the attachment ID before each image;
+     *                                           returning a WP_Error stops the batch there
+     *                                           (used to keep the run's lock alive).
      *
      * @return array
      */
-    public function process_batch( $ids, $offset, $batch_size, $regenerate_existing ) {
-      $ids        = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
-      $offset     = absint( $offset );
-      $batch_size = max( 1, min( 50, absint( $batch_size ) ) );
-
-      $total = count( $ids );
-      if ( $offset >= $total ) {
-        return [
-          'processed'   => 0,
-          'updated'     => 0,
-          'failed'      => 0,
-          'items'       => [],
-          'next_offset' => $offset,
-          'done'        => true,
-          'halted'      => false,
-          'missing'     => $this->count_missing_alt_attachments(),
-        ];
-      }
-
-      $batch_ids = array_slice( $ids, $offset, $batch_size );
+    public function process_batch( $ids, $regenerate_existing, $before_item = null ) {
+      $ids = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
 
       $processed  = 0;
       $updated    = 0;
@@ -208,8 +198,17 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
       $items      = [];
       $halted     = false;
       $halt_error = null;
+      $stop_error = null;
 
-      foreach ( $batch_ids as $attachment_id ) {
+      foreach ( $ids as $attachment_id ) {
+        if ( is_callable( $before_item ) ) {
+          $check = call_user_func( $before_item, $attachment_id );
+          if ( is_wp_error( $check ) ) {
+            $stop_error = $check;
+            break;
+          }
+        }
+
         $processed++;
         $result = $this->plugin->generate_alt_text_for_attachment( $attachment_id, $regenerate_existing );
         $thumb  = $this->get_attachment_thumb_url( $attachment_id );
@@ -222,7 +221,7 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
             'alt'               => '',
             'status'            => 'failed',
             'error_code'        => sanitize_key( $result->get_error_code() ),
-            'error_message'     => sanitize_text_field( $result->get_error_message() ),
+            'error_message'     => PWATG_Provider_Service::redact_secrets( sanitize_text_field( $result->get_error_message() ) ),
             'error_retry_after' => $this->extract_retry_after_from_error( $result ),
           ];
 
@@ -246,22 +245,24 @@ if ( ! class_exists( 'PWATG_Bulk_Service' ) ) {
         }
       }
 
-      $next_offset = $offset + $processed;
-
       $response = [
-        'processed'   => $processed,
-        'updated'     => $updated,
-        'failed'      => $failed,
-        'items'       => $items,
-        'next_offset' => $next_offset,
-        'done'        => $halted ? true : ( $next_offset >= $total ),
-        'halted'      => $halted,
-        'missing' => $this->count_missing_alt_attachments(),
+        'processed' => $processed,
+        'updated'   => $updated,
+        'failed'    => $failed,
+        'items'     => $items,
+        'halted'    => $halted,
+        'stopped'   => null !== $stop_error,
+        'missing'   => $this->count_missing_alt_attachments(),
       ];
+
+      if ( $stop_error ) {
+        $response['stop_code']    = sanitize_key( $stop_error->get_error_code() );
+        $response['stop_message'] = sanitize_text_field( $stop_error->get_error_message() );
+      }
 
       if ( $halted ) {
         $response['halt_code']        = sanitize_key( $halt_error ? $halt_error->get_error_code() : '' );
-        $response['halt_reason']      = $halt_error ? sanitize_text_field( $halt_error->get_error_message() ) : '';
+        $response['halt_reason']      = $halt_error ? PWATG_Provider_Service::redact_secrets( sanitize_text_field( $halt_error->get_error_message() ) ) : '';
         $response['halt_retry_after'] = $halt_error ? $this->extract_retry_after_from_error( $halt_error ) : 0;
       }
 

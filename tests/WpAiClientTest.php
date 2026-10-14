@@ -31,8 +31,7 @@ class WpAiClientTest extends WP_UnitTestCase {
     // Direct calls would go to the stub, so a request reaching it means the AI Client was skipped.
     add_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
 
-    update_option(
-      PWATG::SETTINGS_KEY,
+    pwatg_test_update_option( PWATG::SETTINGS_KEY,
       [
         'connector_source' => 'core',
         'core_connector'   => 'openai',
@@ -50,6 +49,7 @@ class WpAiClientTest extends WP_UnitTestCase {
     remove_all_filters( 'pwatg_use_wp_ai_client' );
     pwatg_test_delete_lock();
 
+    unset( $_SERVER['REQUEST_METHOD'] );
     parent::tearDown();
   }
 
@@ -86,7 +86,7 @@ class WpAiClientTest extends WP_UnitTestCase {
   }
 
   public function test_plugin_mode_never_uses_the_ai_client() {
-    update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'plugin', 'service' => 'openai', 'api_keys' => [ 'openai' => 'sk-plugin' ] ] );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'plugin', 'service' => 'openai', 'api_keys' => [ 'openai' => 'sk-plugin' ] ] );
 
     $this->plugin->generate_alt_text_for_attachment( $this->create_image(), true );
 
@@ -120,7 +120,10 @@ class WpAiClientTest extends WP_UnitTestCase {
   public function provider_ai_client_errors() {
     return [
       'rate limit'       => [ new WP_Error( 'prompt_client_error', 'Too many requests', [ 'status' => 429 ] ), 'pwatg_rate_limited', true ],
-      'quota'            => [ new WP_Error( 'prompt_client_error', 'You exceeded your current quota', [ 'status' => 429 ] ), 'pwatg_quota_exceeded', true ],
+      'billing quota'    => [ new WP_Error( 'prompt_client_error', 'You exceeded your current quota, please check your plan and billing details.', [ 'status' => 429 ] ), 'pwatg_quota_exceeded', true ],
+      'quota wording'    => [ new WP_Error( 'prompt_client_error', 'You exceeded your current quota', [ 'status' => 429 ] ), 'pwatg_rate_limited', true ],
+      'daily quota'      => [ new WP_Error( 'prompt_client_error', 'Quota exceeded for requests per day.', [ 'status' => 429 ] ), 'pwatg_quota_exceeded', true ],
+      'network failure'  => [ new WP_Error( 'prompt_network_error', 'cURL error 28: Operation timed out', [ 'status' => 503 ] ), 'pwatg_api_error', false ],
       'payment'          => [ new WP_Error( 'prompt_client_error', 'Payment required', [ 'status' => 402 ] ), 'pwatg_quota_exceeded', true ],
       'overloaded'       => [ new WP_Error( 'prompt_upstream_server_error', 'Overloaded', [ 'status' => 503 ] ), 'pwatg_rate_limited', true ],
       'bad key'          => [ new WP_Error( 'prompt_client_error', 'Invalid API key', [ 'status' => 401 ] ), 'pwatg_api_error', false ],
@@ -128,9 +131,19 @@ class WpAiClientTest extends WP_UnitTestCase {
     ];
   }
 
+  public function test_a_gemini_per_minute_limit_through_the_ai_client_is_not_a_quota() {
+    $this->ready = [ 'google' ];
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'core', 'core_connector' => 'google', 'service' => 'gemini', 'model' => 'gemini-2.5-flash' ] );
+    PWATG_Fake_Prompt_Builder::$result = new WP_Error( 'prompt_client_error', 'You exceeded your current quota, please check your plan and billing details.', [ 'status' => 429 ] );
+
+    $result = $this->plugin->generate_alt_text_for_attachment( $this->create_image(), true );
+
+    $this->assertSame( 'pwatg_rate_limited', $result->get_error_code(), 'Gemini words per-minute limits this way too.' );
+  }
+
   public function test_the_google_connector_is_tracked_as_gemini_for_limits() {
     $this->ready = [ 'google' ];
-    update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'core', 'core_connector' => 'google', 'service' => 'gemini' ] );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'core', 'core_connector' => 'google', 'service' => 'gemini' ] );
     PWATG_Fake_Prompt_Builder::$result = new WP_Error( 'prompt_client_error', 'Too many requests', [ 'status' => 429 ] );
 
     $result = $this->plugin->generate_alt_text_for_attachment( $this->create_image(), true );
@@ -140,7 +153,7 @@ class WpAiClientTest extends WP_UnitTestCase {
   }
 
   public function test_a_configured_ai_client_provider_counts_as_a_usable_connector() {
-    delete_option( PWATG::SETTINGS_KEY );
+    pwatg_test_delete_option( PWATG::SETTINGS_KEY );
 
     $choices = $this->plugin->get_active_core_connector_choices();
 
@@ -150,6 +163,10 @@ class WpAiClientTest extends WP_UnitTestCase {
 
   public function test_test_connection_uses_the_ai_client() {
     wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
+    if ( is_multisite() ) {
+      // The connection is network-wide, so only Super Admins test it.
+      grant_super_admin( get_current_user_id() );
+    }
     add_filter( 'wp_redirect', [ $this, 'stop_redirect' ] );
     $_POST = [
       'pwatg_test_provider_nonce' => wp_create_nonce( PWATG::AJAX_TEST_PROVIDER ),
@@ -161,6 +178,7 @@ class WpAiClientTest extends WP_UnitTestCase {
     PWATG_Fake_Prompt_Builder::$result = 'OK';
 
     try {
+      $_SERVER['REQUEST_METHOD'] = 'POST';
       $this->plugin->handle_test_provider();
     } catch ( Exception $e ) {
       $this->assertSame( 'redirect', $e->getMessage() );

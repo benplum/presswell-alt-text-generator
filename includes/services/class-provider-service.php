@@ -19,6 +19,9 @@ if ( ! class_exists( 'PWATG_Provider_Service' ) ) {
     /** Seconds to pause after an "overloaded" response that has no Retry-After header. */
     const OVERLOADED_RETRY_SECONDS = 60;
 
+    /** HTTP timeout in seconds for an alt text request, which uploads an image. */
+    const ALT_TEXT_TIMEOUT = 45;
+
     /**
      * Decode a JSON response body, converting non-2xx responses to WP_Error.
      *
@@ -58,6 +61,9 @@ if ( ! class_exists( 'PWATG_Provider_Service' ) ) {
       ];
 
       $retry_after = static::parse_retry_after_header( $response );
+      if ( $retry_after <= 0 ) {
+        $retry_after = static::parse_retry_after_body( $body );
+      }
       if ( $retry_after <= 0 && static::is_overloaded( (int) $http_code, $body, (string) $message ) ) {
         $retry_after = static::OVERLOADED_RETRY_SECONDS;
       }
@@ -114,6 +120,110 @@ if ( ! class_exists( 'PWATG_Provider_Service' ) ) {
      */
     protected static function is_overloaded( $http_code, array $body, $message ) {
       return false;
+    }
+
+    /**
+     * Mask anything in a provider message that looks like a credential.
+     *
+     * Some providers echo part of a rejected key ("Incorrect API key provided: sk-ab***yz"),
+     * so messages shown to users who can't see the settings are masked first.
+     *
+     * @param string $message Message.
+     *
+     * @return string
+     */
+    public static function redact_secrets( $message ) {
+      $redacted = preg_replace(
+        [
+          '/\b(?:sk|pk|rk)[-_][A-Za-z0-9_\-\*\.]{4,}/',
+          '/\bAIza[A-Za-z0-9_\-\*]{4,}/',
+          '/(?<![\w\/.])[A-Za-z0-9_\-\*]{32,}(?![\w\/.])/',
+        ],
+        '[redacted]',
+        (string) $message
+      );
+
+      return is_string( $redacted ) ? $redacted : '';
+    }
+
+    /**
+     * Read a retry delay from the error body, for providers that send one there (overridden per provider).
+     *
+     * @param array $body Decoded error body.
+     *
+     * @return int Seconds, or 0 when absent.
+     */
+    protected static function parse_retry_after_body( array $body ) {
+      return 0;
+    }
+
+    /**
+     * Clean up model output, repairing it when the provider cut it off at the token limit.
+     *
+     * A truncated answer would otherwise be saved as if it were complete, ending mid-word.
+     *
+     * @param string $text      Raw output.
+     * @param bool   $truncated Whether the provider reported hitting the output limit.
+     * @param string $model     Model ID, for the debug log.
+     *
+     * @return string
+     */
+    protected static function finalize_text( $text, $truncated, $model = '' ) {
+      $text = trim( wp_strip_all_tags( (string) $text ) );
+
+      if ( ! $truncated || '' === $text ) {
+        return $text;
+      }
+
+      $repaired = self::trim_truncated_text( $text );
+
+      if ( function_exists( 'presswell_alt_text_generator' ) ) {
+        presswell_alt_text_generator()->debug_log(
+          'Provider output was cut off at the token limit; trimmed to complete words.',
+          [
+            'provider'        => static::PROVIDER,
+            'model'           => (string) $model,
+            'original_length' => mb_strlen( $text ),
+            'trimmed_length'  => mb_strlen( $repaired ),
+          ]
+        );
+      }
+
+      return $repaired;
+    }
+
+    /**
+     * Trim cut-off text to its last complete sentence, or else drop the partial last word.
+     *
+     * @param string $text Text that ended mid-output.
+     *
+     * @return string
+     */
+    public static function trim_truncated_text( $text ) {
+      $text = trim( (string) $text );
+
+      // Everything up to the last sentence-ending mark (plus any closing quote or bracket).
+      if ( preg_match( '/^(.*[.!?\x{3002}\x{FF01}\x{FF1F}][\'"\x{201D}\x{2019})\]]*)\s/us', $text . ' ', $matches ) ) {
+        return trim( $matches[1] );
+      }
+
+      return self::drop_partial_word( $text );
+    }
+
+    /**
+     * Remove the last, possibly incomplete, word and any trailing separator.
+     *
+     * A regex rather than mb_strrpos(), which WordPress doesn't polyfill without mbstring.
+     *
+     * @param string $text Text.
+     *
+     * @return string Unchanged apart from separators when it is a single word.
+     */
+    public static function drop_partial_word( $text ) {
+      $text    = (string) $text;
+      $trimmed = preg_replace( '/\s+\S*$/u', '', $text );
+
+      return rtrim( is_string( $trimmed ) && '' !== $trimmed ? $trimmed : $text, ' ,;:-' );
     }
 
     /**

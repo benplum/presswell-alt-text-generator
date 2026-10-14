@@ -45,6 +45,7 @@ trait PWATG_Bulk_Trait {
     }
 
     check_ajax_referer( PWATG::NONCE_GENERATE_BULK, 'nonce' );
+    $this->require_post_request();
 
     $lock = $this->get_rate_limit_lock_state();
     if ( $lock ) {
@@ -119,7 +120,8 @@ trait PWATG_Bulk_Trait {
     }
 
     $cursor              = isset( $_POST['cursor'] ) ? absint( wp_unslash( $_POST['cursor'] ) ) : 0;
-    $batch_size          = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : 5;
+    $batch_size          = isset( $_POST['batch_size'] ) ? absint( wp_unslash( $_POST['batch_size'] ) ) : PWATG_Bulk_Service::DEFAULT_BATCH_SIZE;
+    $batch_size          = max( 1, min( PWATG_Bulk_Service::MAX_BATCH_SIZE, $batch_size ) );
     $run_test            = ! empty( $_POST['run_test'] );
     $regenerate_existing = $run_test ? false : ! empty( $_POST['regenerate_existing'] );
 
@@ -127,8 +129,26 @@ trait PWATG_Bulk_Trait {
       $batch_size = min( 5, $batch_size );
     }
 
-    $results = $this->get_bulk_service()->process_next_batch( $cursor, $batch_size, $regenerate_existing );
+    $this->extend_bulk_batch_time_limit( $batch_size );
+
+    // Check in before each image, so a long batch isn't mistaken for an abandoned run
+    // and stops if another run took over meanwhile.
+    $heartbeat = function () use ( $run_id ) {
+      return $this->touch_bulk_run( $run_id );
+    };
+
+    $results = $this->get_bulk_service()->process_next_batch( $cursor, $batch_size, $regenerate_existing, $heartbeat );
     $this->missing_alt_count_cache = $results['missing'];
+
+    if ( ! empty( $results['stopped'] ) ) {
+      wp_send_json_error(
+        [
+          'message' => isset( $results['stop_message'] ) ? $results['stop_message'] : '',
+          'code'    => isset( $results['stop_code'] ) ? $results['stop_code'] : 'pwatg_bulk_run_replaced',
+        ],
+        409
+      );
+    }
 
     $this->debug_log(
       empty( $results['halted'] ) ? 'Bulk generation batch processed.' : 'Bulk run halted by a provider limit.',
@@ -207,7 +227,7 @@ trait PWATG_Bulk_Trait {
    * Claim the site's bulk run, so two admins (or a browser and WP-CLI) don't
    * process and pay for the same images at once.
    *
-   * A run that hasn't checked in for PWATG::BULK_RUN_STALE_SECONDS (a closed tab,
+   * A run that hasn't checked in for get_bulk_run_stale_seconds() (a closed tab,
    * a crashed process) can be taken over.
    *
    * @param string $owner Who is running it, for the message another admin sees.
@@ -291,7 +311,50 @@ trait PWATG_Bulk_Trait {
    * @return bool
    */
   protected function is_bulk_run_stale( array $run ) {
-    return (int) $run['heartbeat'] < time() - PWATG::BULK_RUN_STALE_SECONDS;
+    return (int) $run['heartbeat'] < time() - $this->get_bulk_run_stale_seconds();
+  }
+
+  /**
+   * How long a run may go without checking in before another run can take over.
+   *
+   * At least a full default batch of slow provider requests, so a run that is
+   * still working (even between heartbeats) is never mistaken for an abandoned one.
+   *
+   * @return int Seconds.
+   */
+  protected function get_bulk_run_stale_seconds() {
+    $batch_seconds = PWATG_Bulk_Service::DEFAULT_BATCH_SIZE * PWATG_Provider_Service::ALT_TEXT_TIMEOUT + 30;
+
+    return max( PWATG::BULK_RUN_STALE_SECONDS, $batch_seconds );
+  }
+
+  /**
+   * Give an AJAX batch time for every image's provider request, where the host allows it.
+   *
+   * Skipped on the command line, where PHP has no limit and a test run shouldn't get one.
+   *
+   * @param int $batch_size Images in the batch.
+   */
+  protected function extend_bulk_batch_time_limit( $batch_size ) {
+    if ( 'cli' === PHP_SAPI || ! function_exists( 'set_time_limit' ) ) {
+      return;
+    }
+
+    $disabled = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
+    if ( in_array( 'set_time_limit', $disabled, true ) ) {
+      return;
+    }
+
+    $seconds = absint( $batch_size ) * PWATG_Provider_Service::ALT_TEXT_TIMEOUT + 30;
+    $current = (int) ini_get( 'max_execution_time' );
+
+    // 0 means no limit; never shorten a longer one.
+    if ( 0 === $current || $current >= $seconds ) {
+      return;
+    }
+
+    // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- Only raises a shorter limit so a batch of slow provider requests can finish.
+    set_time_limit( $seconds );
   }
 
   /**

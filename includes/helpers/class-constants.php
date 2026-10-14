@@ -12,12 +12,19 @@ class PWATG {
   const KEY = 'pwatg';
   const SETTINGS_KEY = 'pwatg_settings';
   const TEXT_DOMAIN = 'presswell-alt-text-generator';
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
 
   // Settings Page
   const SETTINGS_PAGE_SLUG = 'presswell-alt-text-generator';
   const SETTINGS_PAGE_URL = 'options-general.php?page=' . self::SETTINGS_PAGE_SLUG;
   const SETTINGS_PAGE_SCREEN_ID = 'settings_page_' . self::SETTINGS_PAGE_SLUG;
+
+  // Multisite network mode: provider settings belong to the network; sites choose only
+  // Generate on Upload. The screen ID (not the hook suffix) carries the "-network" suffix.
+  const NETWORK_SETTINGS_SCREEN_ID = 'settings_page_' . self::SETTINGS_PAGE_SLUG . '-network';
+  const ACTION_SAVE_NETWORK_SETTINGS = 'pwatg_save_network_settings';
+  const SITE_SETTINGS_KEY = 'pwatg_site_settings';
+  const SITE_SETTINGS_GROUP = 'pwatg_site_settings_group';
 
   // Bulk Page
   const BULK_PAGE_SLUG = 'presswell-alt-text-bulk-generator';
@@ -88,8 +95,8 @@ class PWATG {
   const ACTION_DOWNLOAD_LOG = 'pwatg_download_log';
   const NONCE_DEBUG = 'pwatg_debug';
   const NONCE_DOWNLOAD_LOG = 'pwatg_download_log';
-  const ASSET_HANDLE_DEBUG_JS = 'pwatg-js-debug';
-  const JS_OBJECT_DEBUG = 'pwatgDebugData';
+  const ASSET_HANDLE_DEBUG_LOG_JS = 'pwatg-debug-log-js';
+  const JS_OBJECT_DEBUG_LOG = 'PWATG_DEBUG_LOG';
 
   // Field Keys
   const FIELD_GENERATE_SINGLE = 'pwatg_generate_alt';

@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Shared utility helpers for locating plugin assets and rendering templates.
  */
 trait PWATG_Helpers_Trait {
-  
+
   /**
    * Safely load a PHP view partial while exposing the provided context.
    *
@@ -85,7 +85,7 @@ trait PWATG_Helpers_Trait {
   }
 
   /**
-   * Read an option from the site whose settings apply (the main site on Multisite).
+   * Read a setting that applies everywhere: the network's in network mode.
    *
    * @param string $name    Option name.
    * @param mixed  $default Default value.
@@ -93,34 +93,30 @@ trait PWATG_Helpers_Trait {
    * @return mixed
    */
   protected function get_shared_option( $name, $default = false ) {
-    if ( is_multisite() && function_exists( 'get_blog_option' ) ) {
-      return get_blog_option( get_main_site_id(), $name, $default );
-    }
-
-    return get_option( $name, $default );
+    return $this->is_network_mode() ? get_site_option( $name, $default ) : get_option( $name, $default );
   }
 
   /**
+   * Save a setting that applies everywhere: the network's in network mode.
+   *
    * @param string $name  Option name.
    * @param mixed  $value Value.
+   *
+   * @return bool
    */
   protected function update_shared_option( $name, $value ) {
-    if ( is_multisite() && function_exists( 'update_blog_option' ) ) {
-      return update_blog_option( get_main_site_id(), $name, $value );
-    }
-
-    return update_option( $name, $value, false );
+    return $this->is_network_mode() ? update_site_option( $name, $value ) : update_option( $name, $value, false );
   }
 
   /**
+   * Delete a setting that applies everywhere: the network's in network mode.
+   *
    * @param string $name Option name.
+   *
+   * @return bool
    */
   protected function delete_shared_option( $name ) {
-    if ( is_multisite() && function_exists( 'delete_blog_option' ) ) {
-      return delete_blog_option( get_main_site_id(), $name );
-    }
-
-    return delete_option( $name );
+    return $this->is_network_mode() ? delete_site_option( $name ) : delete_option( $name );
   }
 
   /**
@@ -406,18 +402,24 @@ trait PWATG_Helpers_Trait {
   }
 
   /**
-   * Recursively sanitize and redact debug context values.
+   * Clean log context: secrets are redacted and long strings shortened. The same in
+   * every Presswell plugin.
    *
-   * @param mixed $value Raw context value.
+   * @param mixed $value Context value.
    *
    * @return mixed
    */
   protected function sanitize_debug_log_value( $value ) {
+    if ( is_object( $value ) ) {
+      $value = (array) $value;
+    }
+
     if ( is_array( $value ) ) {
       $sanitized = [];
       foreach ( $value as $key => $item ) {
-        $clean_key = is_string( $key ) ? sanitize_key( $key ) : $key;
-        if ( is_string( $clean_key ) && preg_match( '/(api|key|token|secret|auth|password|binary)/i', $clean_key ) ) {
+        // Names of secrets, not IDs like size_key or counts like max_tokens.
+        // sanitize_key() keeps hyphens, so header names like x-api-key are matched as x_api_key.
+        if ( is_string( $key ) && preg_match( '/(api_?key|access_?key|private_?key|secret|password|passwd|credential|nonce|binary|authorization|authtoken|(^|_)auth(_|$)|(^|_)token$)/', str_replace( '-', '_', sanitize_key( $key ) ) ) ) {
           $sanitized[ $key ] = '[redacted]';
           continue;
         }
@@ -428,17 +430,10 @@ trait PWATG_Helpers_Trait {
       return $sanitized;
     }
 
-    if ( is_object( $value ) ) {
-      return $this->sanitize_debug_log_value( (array) $value );
-    }
-
     if ( is_string( $value ) ) {
       $value = sanitize_text_field( $value );
-      if ( mb_strlen( $value ) > 300 ) {
-        return mb_substr( $value, 0, 300 ) . '...';
-      }
 
-      return $value;
+      return mb_strlen( $value ) > 300 ? mb_substr( $value, 0, 300 ) . '...' : $value;
     }
 
     return $value;

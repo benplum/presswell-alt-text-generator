@@ -6,6 +6,57 @@ PLUGIN_NAME="presswell-alt-text-generator"
 GIT_REPO="git@github.com:benplum/presswell-alt-text-generator.git"
 SVN_USER="presswell"
 ASSETS_DIR="wp-assets"
+DRY_RUN=0
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/wp-sync.sh [options]
+
+Options:
+  -p=VALUE, --plugin-name=VALUE   WordPress.org plugin slug.
+  -g=VALUE, --git-repo=VALUE      Git repository URL.
+  -u=VALUE, --svn-user=VALUE      SVN username used for commits.
+  -a=VALUE, --assets-dir=VALUE    Assets directory inside git checkout.
+  -n, --dry-run                   Validate config and tooling without network or writes.
+  -h, --help                      Show this help message.
+USAGE
+}
+
+log_run() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "[dry-run] $*"
+    return 0
+  fi
+
+  "$@"
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Required command '$1' was not found on PATH."
+    exit 1
+  fi
+}
+
+preflight() {
+  if [ -z "$PLUGIN_NAME" ]; then
+    echo "Plugin name cannot be empty."
+    exit 1
+  fi
+
+  if ! printf '%s' "$PLUGIN_NAME" | grep -Eq '^[a-z0-9-]+$'; then
+    echo "Plugin name must contain only lowercase letters, numbers, and hyphens."
+    exit 1
+  fi
+
+  require_command git
+  require_command svn
+  require_command rsync
+  require_command awk
+  require_command grep
+  require_command find
+  require_command xargs
+}
 
 for i in "$@"
 do
@@ -26,8 +77,17 @@ case $i in
   ASSETS_DIR="${i#*=}"
     shift # past argument=value
     ;;
+    -n|--dry-run)
+  DRY_RUN=1
+    shift
+    ;;
+    -h|--help)
+    usage
+    exit 0
+    ;;
     *)
     echo "Unknown option '${i#*=}', aborting..."
+    usage
     exit
     ;;
 esac
@@ -37,6 +97,7 @@ readonly PLUGIN_NAME
 readonly GIT_REPO
 readonly SVN_USER
 readonly ASSETS_DIR
+readonly DRY_RUN
 
 readonly GIT_DIR=$(pwd)/git
 readonly GIT_ASSETS_DIR="$GIT_DIR/$ASSETS_DIR"
@@ -75,9 +136,9 @@ get_stable_tag () {
 }
 
 fetch_svn_repo () {
-  rm -rf "$SVN_DIR"
+  log_run rm -rf "$SVN_DIR"
   echo "Fetch clean SVN repository."
-  if ! svn co "$SVN_REPO" "$SVN_DIR" > /dev/null; then
+  if ! log_run svn co "$SVN_REPO" "$SVN_DIR" > /dev/null; then
     echo "Unable to fetch content from SVN repository at URL $SVN_REPO."
     exit
   fi
@@ -85,9 +146,9 @@ fetch_svn_repo () {
 }
 
 fetch_git_repo () {
-  rm -rf "$GIT_DIR"
+  log_run rm -rf "$GIT_DIR"
   echo "Fetch clean GIT repository."
-  if ! git clone "$GIT_REPO" "$GIT_DIR"; then
+  if ! log_run git clone "$GIT_REPO" "$GIT_DIR"; then
     echo "Unable to fetch content from GIT repository at URL $GIT_REPO."
     exit
   fi
@@ -97,10 +158,10 @@ fetch_git_repo () {
 stage_and_commit_changes () {
   local message=$1
 
-  svn add --force --quiet .
+  log_run svn add --force --quiet .
 
   if [ -d "$ASSETS_DIR" ]; then
-    svn del --force --quiet "$ASSETS_DIR"
+    log_run svn del --force --quiet "$ASSETS_DIR"
   fi
 
   find . -type f -name "*.png" \
@@ -127,7 +188,7 @@ stage_and_commit_changes () {
   changes=$(svn status -q)
   if [[ $changes ]]; then
     echo "Detected changes in $(pwd), about to commit them."
-    svn commit --username="$SVN_USER" -m "$message"
+    log_run svn commit --username="$SVN_USER" -m "$message"
   else
     echo "No changes detected changes in $(pwd)."
   fi
@@ -140,9 +201,66 @@ sync_files () {
   local excludeFrom="$source.distignore"
 
   if [ -f "$excludeFrom" ]; then
-    rsync --compress --recursive --delete --delete-excluded --force --archive --exclude-from "$excludeFrom" "$source" "$destination"
+    log_run rsync --compress --recursive --delete --delete-excluded --force --archive --exclude-from "$excludeFrom" "$source" "$destination"
   else
-    rsync --compress --recursive --delete --delete-excluded --force --archive "$source" "$destination"
+    log_run rsync --compress --recursive --delete --delete-excluded --force --archive "$source" "$destination"
+  fi
+}
+
+# Version from the main plugin file's header in a directory.
+get_header_version () {
+  local dir=$1
+
+  sed -n 's/^[[:space:]*]*Version:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$dir/$PLUGIN_NAME.php" 2>/dev/null | head -n 1
+}
+
+# Stable tag from the readme in a directory.
+get_readme_stable_tag () {
+  local dir=$1
+
+  sed -n 's/^Stable tag:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$dir/readme.txt" 2>/dev/null | head -n 1
+}
+
+# Stop before committing anything if a release would publish mismatched versions.
+# A tag whose header doesn't match makes WordPress offer the same update forever.
+validate_release_versions () {
+  local branch=$1
+  local errors=0
+
+  cd "$GIT_DIR" || exit
+
+  for tag in $(git tag); do
+    if [ -d "$SVN_TAGS_DIR/$tag" ]; then
+      local published
+      published=$(get_header_version "$SVN_TAGS_DIR/$tag")
+      if [ "$published" != "$tag" ]; then
+        echo "Warning: published SVN tag $tag has Version: $published. It can't be re-synced; release a new version to fix it."
+      fi
+      continue
+    fi
+
+    git checkout "tags/$tag" > /dev/null 2>&1
+    local version
+    version=$(get_header_version "$GIT_DIR")
+    if [ "$version" != "$tag" ]; then
+      echo "Error: git tag $tag has Version: $version in $PLUGIN_NAME.php. Fix the header, move the tag, then sync."
+      errors=1
+    fi
+  done
+
+  git checkout "$branch" > /dev/null 2>&1
+
+  local header_version stable_tag
+  header_version=$(get_header_version "$GIT_DIR")
+  stable_tag=$(get_readme_stable_tag "$GIT_DIR")
+  if [ -n "$stable_tag" ] && [ "$stable_tag" != "trunk" ] && [ "$header_version" != "$stable_tag" ]; then
+    echo "Error: $branch has Version: $header_version but Stable tag: $stable_tag."
+    errors=1
+  fi
+
+  if [ "$errors" = "1" ]; then
+    echo "Nothing was synced."
+    exit 1
   fi
 }
 
@@ -157,10 +275,10 @@ sync_tag () {
   cd "$GIT_DIR" || exit
 
   echo "Checking out 'tags/$tag'."
-  git checkout "tags/$tag" > /dev/null 2>&1
+  log_run git checkout "tags/$tag" > /dev/null 2>&1
 
   echo "Copying files over to svn repository in folder $SVN_DIR/tags/$tag."
-  mkdir "$SVN_DIR/tags/$tag"
+  log_run mkdir "$SVN_DIR/tags/$tag"
   sync_files . "$SVN_DIR/tags/$tag"
 
   cd "$SVN_DIR/tags/$tag" || exit
@@ -183,7 +301,7 @@ sync_stable_tag () {
   fi
 
   echo "Creating missing stable SVN tag '$stable_tag' from trunk."
-  mkdir -p "$SVN_TAGS_DIR/$stable_tag"
+  log_run mkdir -p "$SVN_TAGS_DIR/$stable_tag"
   sync_files "$SVN_TRUNK_DIR" "$SVN_TAGS_DIR/$stable_tag"
 
   cd "$SVN_TAGS_DIR/$stable_tag" || exit
@@ -204,7 +322,7 @@ sync_trunk () {
   cd "$GIT_DIR" || exit
 
   echo "Checking out $branch branch."
-  git checkout "$branch" > /dev/null 2>&1
+  log_run git checkout "$branch" > /dev/null 2>&1
 
   echo "Copying files over to svn repository in folder $SVN_TRUNK_DIR."
   sync_files . "$SVN_TRUNK_DIR"
@@ -217,7 +335,7 @@ sync_assets () {
   local branch=$1
 
   cd "$GIT_DIR" || exit
-  git checkout "$branch" > /dev/null 2>&1
+  log_run git checkout "$branch" > /dev/null 2>&1
 
   if [ -d "$GIT_ASSETS_DIR" ]; then
     sync_files "$GIT_ASSETS_DIR" "$SVN_ASSETS_DIR"
@@ -228,11 +346,25 @@ sync_assets () {
   stage_and_commit_changes "Updating assets"
 }
 
+preflight
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "Dry-run mode enabled."
+  echo "PLUGIN_NAME=$PLUGIN_NAME"
+  echo "GIT_REPO=$GIT_REPO"
+  echo "SVN_REPO=$SVN_REPO"
+  echo "ASSETS_DIR=$ASSETS_DIR"
+  echo "SVN_USER=$SVN_USER"
+  exit 0
+fi
+
 fetch_svn_repo
 fetch_git_repo
 
 DEFAULT_BRANCH=$(get_default_branch)
 readonly DEFAULT_BRANCH
+
+validate_release_versions "$DEFAULT_BRANCH"
 
 sync_assets "$DEFAULT_BRANCH"
 sync_all_tags

@@ -3,7 +3,8 @@
  * Plugin Name: Presswell Alt Text Generator
  * Description: Generate AI-powered alt text for WordPress media.
  * Author: Presswell
- * Version: 1.2.0
+ * Version: 1.3.0
+ * Requires PHP: 7.4
  * Plugin URI: https://wordpress.org/plugins/presswell-alt-text-generator
  * Author URI: https://presswell.co
  * License: GPLv2 or later
@@ -25,9 +26,11 @@ require_once __DIR__ . '/includes/traits/trait-bulk.php';
 require_once __DIR__ . '/includes/traits/trait-cli.php';
 require_once __DIR__ . '/includes/traits/trait-helpers.php';
 require_once __DIR__ . '/includes/traits/trait-media.php';
+require_once __DIR__ . '/includes/traits/trait-network.php';
 require_once __DIR__ . '/includes/traits/trait-pages.php';
 require_once __DIR__ . '/includes/traits/trait-providers.php';
 require_once __DIR__ . '/includes/traits/trait-settings.php';
+require_once __DIR__ . '/includes/traits/trait-status.php';
 require_once __DIR__ . '/includes/services/class-provider-service.php';
 require_once __DIR__ . '/includes/services/class-openai-service.php';
 require_once __DIR__ . '/includes/services/class-anthropic-service.php';
@@ -48,9 +51,11 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
     use PWATG_CLI_Trait;
     use PWATG_Helpers_Trait;
     use PWATG_Media_Trait;
+    use PWATG_Network_Trait;
     use PWATG_Pages_Trait;
     use PWATG_Providers_Trait;
     use PWATG_Settings_Trait;
+    use PWATG_Status_Trait;
 
     const PLUGIN_FILE = __FILE__;
 
@@ -69,6 +74,7 @@ if ( ! class_exists( 'Presswell_Alt_Text_Generator' ) ) {
       $this->construct_block_editor_trait();
       $this->construct_bulk_trait();
       $this->construct_media_trait();
+      $this->construct_network_trait();
 
       $this->construct_pages_trait();
       $this->construct_settings_trait();

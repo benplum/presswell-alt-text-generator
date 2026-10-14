@@ -15,7 +15,7 @@
   const apiKeyRow = pluginApiKeyGroup ? pluginApiKeyGroup.closest('tr') : null;
   const coreConnectorRow = coreConnectorWrap ? coreConnectorWrap.closest('tr') : null;
   const apiKeyWraps = document.querySelectorAll('.pwatg-api-key-wrap');
-  const testForm = document.getElementById('pwatg-test-connection-form');
+  const deprecationNotice = document.querySelector('.pwatg-plugin-source-deprecated');
   const modelMap = data.modelMap || {};
   const currentModel = data.currentModel || '';
   const hasCoreConnectors = !!data.hasCoreConnectors;
@@ -115,26 +115,13 @@
       coreConnectorWrap.classList.toggle('is-hidden', !isCoreMode);
     }
 
-    updateApiKeyField(service);
-    updateModels(service);
-  }
-
-  function syncTestFormFields() {
-    if (!testForm) {
-      return;
+    // Plugin API keys are deprecated; warn while that source is selected.
+    if (deprecationNotice) {
+      deprecationNotice.hidden = source !== 'plugin';
     }
 
-    const service = serviceSelect.value || 'openai';
-    const model = modelSelect.value || '';
-    const source = getSelectedConnectorSource();
-    const apiInput = source === 'plugin'
-      ? document.querySelector('input[name="' + optionKey + '[api_keys][' + service + ']"]')
-      : null;
-    const apiKey = apiInput ? apiInput.value : '';
-
-    testForm.querySelector('input[name="service"]').value = service;
-    testForm.querySelector('input[name="model"]').value = model;
-    testForm.querySelector('input[name="api_key"]').value = apiKey;
+    updateApiKeyField(service);
+    updateModels(service);
   }
 
   serviceSelect.addEventListener('change', syncFields);
@@ -145,9 +132,6 @@
     connectorSourceInputs.forEach(function(input) {
       input.addEventListener('change', syncFields);
     });
-  }
-  if (testForm) {
-    testForm.addEventListener('submit', syncTestFormFields);
   }
   syncFields();
 })();

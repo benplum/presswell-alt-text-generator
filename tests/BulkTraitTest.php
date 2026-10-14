@@ -219,7 +219,7 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
   public function test_a_stale_run_can_be_taken_over() {
     $this->plugin->acquire_bulk_run( 'Closed tab' );
     $run              = get_option( PWATG::OPTION_BULK_RUN );
-    $run['heartbeat'] = time() - PWATG::BULK_RUN_STALE_SECONDS - 5;
+    $run['heartbeat'] = time() - $this->invoke_protected_method( 'get_bulk_run_stale_seconds' ) - 5;
     update_option( PWATG::OPTION_BULK_RUN, $run );
 
     $this->assertIsString( $this->plugin->acquire_bulk_run( 'New admin' ) );
@@ -288,6 +288,90 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $this->assertSame( '', get_post_meta( $older, PWATG::META_KEY_ALT_TEXT, true ) );
   }
 
+  public function test_bulk_init_ajax_rejects_get_requests() {
+    $this->create_image_attachment();
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_POST = [ 'nonce' => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ) ];
+
+    $response = $this->ajax( PWATG::AJAX_INIT_BULK );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertFalse( get_option( PWATG::OPTION_BULK_RUN ), 'No run lock is taken.' );
+  }
+
+  public function test_each_image_in_a_batch_keeps_the_run_alive() {
+    for ( $i = 0; $i < 3; $i++ ) {
+      $this->create_image_attachment();
+    }
+
+    $run_id     = $this->plugin->acquire_bulk_run( 'Test' );
+    $heartbeats = [];
+
+    // Runs once per image, before its request. Pretend each request took a long time.
+    $slow_image = static function ( $include ) use ( &$heartbeats ) {
+      $run          = get_option( PWATG::OPTION_BULK_RUN );
+      $heartbeats[] = (int) $run['heartbeat'];
+      $run['heartbeat'] = time() - HOUR_IN_SECONDS;
+      update_option( PWATG::OPTION_BULK_RUN, $run );
+
+      return $include;
+    };
+    add_filter( 'pwatg_include_filename_in_prompt', $slow_image );
+
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'     => $run_id,
+      'cursor'     => 0,
+      'batch_size' => 3,
+    ];
+
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
+    remove_filter( 'pwatg_include_filename_in_prompt', $slow_image );
+
+    $this->assertTrue( $response['success'] );
+    $this->assertSame( 3, $response['data']['processed'] );
+    $this->assertCount( 3, $heartbeats );
+    foreach ( $heartbeats as $heartbeat ) {
+      $this->assertGreaterThanOrEqual( time() - 5, $heartbeat, 'The run checked in before every image.' );
+    }
+  }
+
+  public function test_a_batch_stops_when_another_run_takes_over() {
+    $this->create_image_attachment();
+    $this->create_image_attachment();
+    $run_id = $this->plugin->acquire_bulk_run( 'Test' );
+
+    $take_over = static function ( $include ) {
+      update_option( PWATG::OPTION_BULK_RUN, [ 'id' => 'other-run', 'owner' => 'Other admin', 'heartbeat' => time() ] );
+
+      return $include;
+    };
+    add_filter( 'pwatg_include_filename_in_prompt', $take_over );
+
+    $_POST = [
+      'nonce'      => wp_create_nonce( PWATG::NONCE_GENERATE_BULK ),
+      'run_id'     => $run_id,
+      'cursor'     => 0,
+      'batch_size' => 2,
+    ];
+
+    $response = $this->ajax( PWATG::AJAX_GENERATE_BULK );
+    remove_filter( 'pwatg_include_filename_in_prompt', $take_over );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertSame( 'pwatg_bulk_run_replaced', $response['data']['code'] );
+    $this->assertSame( 'other-run', get_option( PWATG::OPTION_BULK_RUN )['id'], 'The other run keeps its lock.' );
+  }
+
+  public function test_a_run_in_the_middle_of_a_slow_batch_is_not_taken_over() {
+    $this->plugin->acquire_bulk_run( 'Busy tab' );
+    $run              = get_option( PWATG::OPTION_BULK_RUN );
+    $run['heartbeat'] = time() - 3 * MINUTE_IN_SECONDS;
+    update_option( PWATG::OPTION_BULK_RUN, $run );
+
+    $this->assertInstanceOf( WP_Error::class, $this->plugin->acquire_bulk_run( 'New admin' ), 'Five images at the request timeout take longer than two minutes.' );
+  }
+
   /**
    * Run an AJAX action and return the decoded JSON response.
    */
@@ -322,7 +406,8 @@ class BulkTraitTest extends WP_Ajax_UnitTestCase {
     $defaults = $this->plugin->get_default_settings();
     $defaults['api_keys']['openai'] = 'sk-test';
     $defaults['auto_generate'] = '';
-    update_option( PWATG::SETTINGS_KEY, $defaults );
+    $defaults['connector_source'] = 'plugin';
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 
   protected function create_image_attachment() {

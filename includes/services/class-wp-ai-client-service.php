@@ -31,6 +31,15 @@ if ( ! class_exists( 'PWATG_WP_AI_Client_Service' ) ) {
     const MAX_TOKENS = 1024;
 
     /**
+     * AI Client error codes that carry a 503 without the provider being overloaded.
+     *
+     * prompt_prevented: a site filter blocked the prompt. prompt_network_error: the
+     * request never reached the provider, which is a plain failure like
+     * http_request_failed on the direct path, not a reason to pause every request.
+     */
+    const NOT_OVERLOADED_CODES = [ 'prompt_prevented', 'prompt_network_error' ];
+
+    /**
      * Whether the WordPress AI Client can be used on this site.
      *
      * @return bool
@@ -179,8 +188,8 @@ if ( ! class_exists( 'PWATG_WP_AI_Client_Service' ) ) {
       if ( 402 === $status ) {
         $code = 'pwatg_quota_exceeded';
       } elseif ( 429 === $status ) {
-        $code = false !== stripos( $error->get_error_message(), 'quota' ) ? 'pwatg_quota_exceeded' : 'pwatg_rate_limited';
-      } elseif ( in_array( $status, [ 503, 529 ], true ) && 'prompt_prevented' !== $error->get_error_code() ) {
+        $code = self::is_exhausted_quota_message( $error->get_error_message(), $provider_id ) ? 'pwatg_quota_exceeded' : 'pwatg_rate_limited';
+      } elseif ( in_array( $status, [ 503, 529 ], true ) && ! in_array( $error->get_error_code(), self::NOT_OVERLOADED_CODES, true ) ) {
         $code = 'pwatg_rate_limited';
       }
 
@@ -195,6 +204,33 @@ if ( ! class_exists( 'PWATG_WP_AI_Client_Service' ) ) {
       }
 
       return new WP_Error( $code, sanitize_text_field( $error->get_error_message() ), $error_data );
+    }
+
+    /**
+     * Whether a 429's message means a daily or billing quota is used up, not a short rate limit.
+     *
+     * Only the message survives the AI Client, and "quota" alone isn't enough: Gemini
+     * words per-minute limits as "You exceeded your current quota". OpenAI's exhausted
+     * balance mentions billing, but Gemini's per-minute message does too, so for Google
+     * only an explicit daily limit counts.
+     *
+     * @param string $message     Error message.
+     * @param string $provider_id AI Client provider ID.
+     *
+     * @return bool
+     */
+    protected static function is_exhausted_quota_message( $message, $provider_id ) {
+      $message = (string) $message;
+
+      if ( preg_match( '/per[\s_-]?day|daily/i', $message ) ) {
+        return true;
+      }
+
+      if ( in_array( sanitize_key( (string) $provider_id ), [ 'google', 'gemini' ], true ) ) {
+        return false;
+      }
+
+      return (bool) preg_match( '/insufficient_quota|billing|credit balance/i', $message );
     }
   }
 }

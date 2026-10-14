@@ -82,6 +82,33 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $this->assertFalse( $this->restore( $attachment_id )['success'] );
   }
 
+  public function test_restoring_keeps_backslashes() {
+    $attachment_id = $this->create_image_attachment();
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'AI text' );
+    update_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, wp_slash( 'Saved in C:\\Photos' ) );
+
+    $this->assertTrue( $this->restore( $attachment_id )['success'] );
+    $this->assertSame( 'Saved in C:\\Photos', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+  }
+
+  public function test_errors_say_why_without_revealing_keys() {
+    $attachment_id = $this->create_image_attachment();
+
+    PWATG_Test_Provider::$response = new WP_Error( 'pwatg_api_error', 'The model `gpt-9` does not exist or you do not have access to it.', [ 'provider' => 'openai' ] );
+    $response = $this->generate( $attachment_id );
+
+    $this->assertFalse( $response['success'] );
+    $this->assertSame( 'error', $response['data']['status'] );
+    $this->assertStringContainsString( 'does not exist', $response['data']['message'] );
+
+    PWATG_Test_Provider::$response = new WP_Error( 'pwatg_api_error', 'Incorrect API key provided: sk-proj-abcd************************wxyz.', [ 'provider' => 'openai' ] );
+    $response = $this->generate( $attachment_id );
+
+    $this->assertStringContainsString( 'Incorrect API key provided', $response['data']['message'] );
+    $this->assertStringNotContainsString( 'sk-proj', $response['data']['message'] );
+    $this->assertStringNotContainsString( 'wxyz', $response['data']['message'] );
+  }
+
   public function test_restore_requires_permission_a_post_and_its_own_nonce() {
     $attachment_id = $this->create_image_attachment();
     update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, 'AI text' );
@@ -158,7 +185,7 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $attachment_id = $this->create_image_attachment();
     $settings = $this->plugin->get_settings();
     $settings['api_keys']['openai'] = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
     $nonce = wp_create_nonce( PWATG::NONCE_GENERATE_SINGLE . $attachment_id );
 
     $_POST = [
@@ -212,7 +239,8 @@ class SingleMediaAjaxTest extends WP_Ajax_UnitTestCase {
     $defaults['api_keys']['anthropic'] = '';
     $defaults['api_keys']['gemini'] = '';
     $defaults['auto_generate'] = '';
-    update_option( PWATG::SETTINGS_KEY, $defaults );
+    $defaults['connector_source'] = 'plugin';
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $defaults );
   }
 
   protected function create_image_attachment() {

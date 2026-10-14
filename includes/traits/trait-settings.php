@@ -17,19 +17,38 @@ trait PWATG_Settings_Trait {
     add_action( 'wp_ajax_' . PWATG::AJAX_DEBUG_READ_LOG, [ $this, 'ajax_debug_read_log' ] );
     add_action( 'wp_ajax_' . PWATG::AJAX_DEBUG_CLEAR_LOG, [ $this, 'ajax_debug_clear_log' ] );
     add_action( 'admin_notices', [ $this, 'render_debug_log_expired_notice' ] );
+    // In network mode the setting lives in Network Admin, so Super Admins see the notice there too.
+    add_action( 'network_admin_notices', [ $this, 'render_debug_log_expired_notice' ] );
   }
 
   /** Register the plugin option, fields, and section definitions. */
   public function register_settings() {
-    register_setting(
-      'pwatg_settings_group',
-      PWATG::SETTINGS_KEY,
-      [
-        'type'              => 'array',
-        'sanitize_callback' => [ $this, 'sanitize_settings' ],
-        'default'           => $this->get_default_settings(),
-      ]
-    );
+    if ( $this->is_network_mode() ) {
+      // Network settings save through their own handler, which sanitizes once. Not
+      // registering them here also stops a site's options.php from saving a copy.
+      register_setting(
+        PWATG::SITE_SETTINGS_GROUP,
+        PWATG::SITE_SETTINGS_KEY,
+        [
+          'type'              => 'array',
+          'sanitize_callback' => [ $this, 'sanitize_site_settings' ],
+          'default'           => [ 'auto_generate' => 'default' ],
+        ]
+      );
+
+      add_settings_section( 'pwatg_site_section', '', '__return_false', PWATG::SITE_SETTINGS_KEY );
+      add_settings_field( 'site_auto_generate', __( 'Generate on Upload', 'presswell-alt-text-generator' ), [ $this, 'render_site_auto_generate_field' ], PWATG::SITE_SETTINGS_KEY, 'pwatg_site_section' );
+    } else {
+      register_setting(
+        'pwatg_settings_group',
+        PWATG::SETTINGS_KEY,
+        [
+          'type'              => 'array',
+          'sanitize_callback' => [ $this, 'sanitize_settings' ],
+          'default'           => $this->get_default_settings(),
+        ]
+      );
+    }
 
     // Untitled: the Settings tab already names the section.
     add_settings_section(
@@ -181,7 +200,7 @@ trait PWATG_Settings_Trait {
 
     // Key fields render empty so saved keys never reach the page source; a blank
     // field keeps the saved key, and the Remove checkbox clears it.
-    $stored          = ( is_multisite() && ! is_main_site() ) ? get_option( PWATG::SETTINGS_KEY, [] ) : $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
+    $stored          = $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
     $stored_api_keys = is_array( $stored ) && isset( $stored['api_keys'] ) && is_array( $stored['api_keys'] ) ? $stored['api_keys'] : [];
     $raw_api_keys    = isset( $input['api_keys'] ) && is_array( $input['api_keys'] ) ? $input['api_keys'] : [];
     $remove_api_keys = isset( $input['api_keys_remove'] ) && is_array( $input['api_keys_remove'] ) ? $input['api_keys_remove'] : [];
@@ -218,11 +237,6 @@ trait PWATG_Settings_Trait {
    * @param bool $enabled Whether the saved settings turn logging on.
    */
   protected function track_debug_logging_clock( $enabled ) {
-    // Only the main site's settings apply on Multisite.
-    if ( is_multisite() && ! is_main_site() ) {
-      return;
-    }
-
     if ( ! $enabled ) {
       $this->delete_shared_option( PWATG::OPTION_DEBUG_LOG_ENABLED_AT );
 
@@ -240,16 +254,12 @@ trait PWATG_Settings_Trait {
 
   /** Retrieve saved settings merged with defaults. */
   public function get_settings() {
+    // Requests that run before init (or skip it) still get the migrated network keys.
+    $this->maybe_migrate_network_settings();
+
     $defaults = $this->get_default_settings();
-    if ( is_multisite() ) {
-      $main_site_id = get_main_site_id();
-      $raw_settings = function_exists('get_blog_option')
-        ? get_blog_option( $main_site_id, PWATG::SETTINGS_KEY, [] )
-        : get_option( PWATG::SETTINGS_KEY, [] );
-      $settings = wp_parse_args( $raw_settings, $defaults );
-    } else {
-      $settings = wp_parse_args( get_option( PWATG::SETTINGS_KEY, [] ), $defaults );
-    }
+    $stored   = $this->get_shared_option( PWATG::SETTINGS_KEY, [] );
+    $settings = wp_parse_args( is_array( $stored ) ? $stored : [], $defaults );
 
     if ( ! isset( $settings['api_keys'] ) || ! is_array( $settings['api_keys'] ) ) {
       $settings['api_keys'] = $defaults['api_keys'];
@@ -268,6 +278,13 @@ trait PWATG_Settings_Trait {
     }
 
     $settings['auto_generate'] = ! empty( $settings['auto_generate'] ) ? 'on' : '';
+
+    // A site on a network may override Generate on Upload. Network Admin shows and
+    // saves the network's own value, so the main site's override never leaks into it.
+    if ( $this->is_network_mode() && ! is_network_admin() && 'default' !== $this->get_site_auto_generate_choice() ) {
+      $settings['auto_generate'] = 'on' === $this->get_site_auto_generate_choice() ? 'on' : '';
+    }
+
     $settings['debug_logging'] = ( isset( $settings['debug_logging'] ) && 'on' === $settings['debug_logging'] ) ? 'on' : 'off';
 
     $settings['connector_source'] = isset( $settings['connector_source'] ) ? sanitize_key( (string) $settings['connector_source'] ) : 'plugin';
@@ -313,8 +330,9 @@ trait PWATG_Settings_Trait {
         'anthropic' => '',
         'gemini'    => '',
       ],
-      // Use WordPress AI Connectors by default only when one already has a key.
-      'connector_source' => $this->has_configured_core_connector() ? 'core' : 'plugin',
+      // WordPress AI Connectors are the recommended setup; plugin keys are deprecated.
+      // get_settings() falls back to 'plugin' where no connectors are available.
+      'connector_source' => 'core',
       'core_connector'   => '',
       'auto_generate' => 'on',
       'debug_logging' => 'off',
@@ -473,7 +491,7 @@ trait PWATG_Settings_Trait {
       return '';
     }
 
-    if ( is_multisite() && function_exists( 'get_blog_option' ) ) {
+    if ( $this->is_network_mode() && function_exists( 'get_blog_option' ) ) {
       $raw_value = get_blog_option( get_main_site_id(), $setting_name, '' );
     } else {
       $raw_value = get_option( $setting_name, '' );
@@ -486,17 +504,25 @@ trait PWATG_Settings_Trait {
   public function render_connector_source_field() {
     $settings = $this->get_settings();
     $source   = isset( $settings['connector_source'] ) ? sanitize_key( $settings['connector_source'] ) : 'plugin';
+    // Connectors live on the main site; from Network Admin this is the main site's screen.
+    $connectors_url = admin_url( 'options-connectors.php' );
     ?>
     <fieldset class="pwatg-connector-source-group" role="radiogroup" aria-label="<?php echo esc_attr__( 'Connector source', 'presswell-alt-text-generator' ); ?>">
-      <label class="pwatg-connector-source-option">
-        <input type="radio" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[connector_source]" value="plugin" <?php checked( $source, 'plugin' ); ?> />
-        <span class="button"><?php echo esc_html__( 'Plugin', 'presswell-alt-text-generator' ); ?></span>
-      </label>
       <label class="pwatg-connector-source-option">
         <input type="radio" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[connector_source]" value="core" <?php checked( $source, 'core' ); ?> />
         <span class="button"><?php echo esc_html__( 'Core', 'presswell-alt-text-generator' ); ?></span>
       </label>
+      <label class="pwatg-connector-source-option">
+        <input type="radio" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[connector_source]" value="plugin" <?php checked( $source, 'plugin' ); ?> />
+        <span class="button"><?php echo esc_html__( 'Plugin', 'presswell-alt-text-generator' ); ?></span>
+      </label>
     </fieldset>
+    <div class="notice notice-warning inline pwatg-plugin-source-deprecated" <?php echo 'plugin' === $source ? '' : 'hidden'; ?>>
+      <p>
+        <?php echo esc_html__( 'Plugin AI Connectors are deprecated and will be removed in a future release.', 'presswell-alt-text-generator' ); ?>
+        <a href="<?php echo esc_url( $connectors_url ); ?>"><?php echo esc_html__( 'Manage AI Connectors', 'presswell-alt-text-generator' ); ?></a>
+      </p>
+    </div>
     <?php
   }
 
@@ -527,14 +553,8 @@ trait PWATG_Settings_Trait {
         <?php endforeach; ?>
       </select>
       <p class="description pwatg-core-connector-message">
-        <?php
-        if ( PWATG_WP_AI_Client_Service::is_provider_ready( $selected ) ) {
-          echo esc_html__( 'Requests go through the WordPress AI Client, using the key saved in Connectors.', 'presswell-alt-text-generator' );
-        } else {
-          echo esc_html__( "This connector's provider isn't available to the WordPress AI Client, so the plugin calls it directly with the connector's key.", 'presswell-alt-text-generator' );
-        }
-        ?>
-        <a href="<?php echo esc_url( $connectors_url ); ?>"><?php echo esc_html__( 'Configure AI Connectors', 'presswell-alt-text-generator' ); ?></a>
+        <?php echo esc_html__( 'Requests use the WordPress AI Client.', 'presswell-alt-text-generator' ); ?>
+        <a href="<?php echo esc_url( $connectors_url ); ?>"><?php echo esc_html__( 'Manage AI Connectors', 'presswell-alt-text-generator' ); ?></a>
       </p>
     </div>
     <?php
@@ -677,7 +697,7 @@ trait PWATG_Settings_Trait {
             ?>
           </p>
           <?php if ( '' !== $saved_key ) : ?>
-            <label>
+            <label style="display: block; margin-top: 10px;">
               <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[api_keys_remove][<?php echo esc_attr( $service ); ?>]" value="1" />
               <?php echo esc_html__( 'Remove saved key', 'presswell-alt-text-generator' ); ?>
             </label>
@@ -752,7 +772,6 @@ trait PWATG_Settings_Trait {
       <a href="<?php echo esc_url( $debug_log_url ); ?>"><?php echo esc_html__( 'View logs', 'presswell-alt-text-generator' ); ?></a>
       <?php endif; ?>
     </label>
-    <!-- <p class="description"><?php echo esc_html__( 'Turns off automatically after 7 days. Logs are kept private and viewed from the Debug tab.', 'presswell-alt-text-generator' ); ?></p> -->
     <?php
   }
 
@@ -762,9 +781,8 @@ trait PWATG_Settings_Trait {
     ?>
     <label>
       <input type="checkbox" name="<?php echo esc_attr( PWATG::SETTINGS_KEY ); ?>[remove_data_on_uninstall]" value="on" <?php checked( isset( $settings['remove_data_on_uninstall'] ) ? $settings['remove_data_on_uninstall'] : '', 'on' ); ?> />
-      <?php echo esc_html__( 'Remove settings and generation history when the plugin is deleted', 'presswell-alt-text-generator' ); ?>
+      <?php echo esc_html__( 'Delete settings when the plugin is deleted. Does not delete stored alt text.', 'presswell-alt-text-generator' ); ?>
     </label>
-    <p class="description"><?php echo esc_html__( 'API keys are always removed when the plugin is deleted. Alt text is never removed; it belongs to your images.', 'presswell-alt-text-generator' ); ?></p>
     <?php
   }
 
@@ -774,18 +792,58 @@ trait PWATG_Settings_Trait {
       return;
     }
 
-    $is_subsite = is_multisite() && ! is_main_site();
+    // In network mode, every site (the main one too) gets its provider settings from Network Admin.
+    $is_subsite = $this->is_network_mode();
 
     $active_tab = 'debug' === sanitize_key( $this->get_query_param( 'tab' ) ) ? 'debug' : 'settings';
 
     $this->render_view(
       'settings-page.php',
       [
+        'is_network'       => false,
         'is_subsite'       => $is_subsite,
         'active_tab'       => $active_tab,
         'settings_tab_url' => admin_url( PWATG::SETTINGS_PAGE_URL ),
         'debug_tab_url'    => $this->get_debug_log_viewer_url(),
       ]
+    );
+  }
+
+  /**
+   * Whether the current user may run Test Connection: it spends the network's
+   * credits in network mode, so it follows the settings capability.
+   *
+   * @return bool
+   */
+  public function can_test_provider() {
+    return current_user_can( $this->get_settings_capability() );
+  }
+
+  /**
+   * Whether the current request was sent as POST.
+   *
+   * @return bool
+   */
+  protected function is_post_request() {
+    $method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '';
+
+    return 'POST' === $method;
+  }
+
+  /**
+   * Store a notice for the current user to see once after a redirect.
+   *
+   * @param string $type    'success' or 'error'.
+   * @param string $message Message text.
+   */
+  protected function queue_admin_notice( $type, $message ) {
+    set_transient(
+      $this->get_test_provider_notice_key(),
+      [
+        'type'    => 'success' === $type ? 'success' : 'error',
+        'message' => (string) $message,
+      ],
+      PWATG::TRANSIENT_NOTICE_TTL
     );
   }
 
@@ -823,8 +881,7 @@ trait PWATG_Settings_Trait {
   public function ajax_debug_clear_log() {
     $this->verify_debug_request();
 
-    $method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '';
-    if ( 'POST' !== $method ) {
+    if ( ! $this->is_post_request() ) {
       wp_send_json_error( [ 'message' => __( 'This action must be sent as a POST request.', 'presswell-alt-text-generator' ) ], 405 );
     }
 
@@ -857,25 +914,35 @@ trait PWATG_Settings_Trait {
 
   /** Show, once, that debug logging was switched off by the 7-day limit. */
   public function render_debug_log_expired_notice() {
-    if ( ! current_user_can( 'manage_options' ) || ! $this->get_shared_option( PWATG::OPTION_DEBUG_LOG_EXPIRED ) ) {
+    // Only users who can turn logging back on see (and so dismiss) the one-time notice.
+    if ( is_network_admin() && ! $this->is_network_mode() ) {
+      return;
+    }
+
+    if ( ! current_user_can( $this->get_settings_capability() ) || ! $this->get_shared_option( PWATG::OPTION_DEBUG_LOG_EXPIRED ) ) {
       return;
     }
 
     $this->delete_shared_option( PWATG::OPTION_DEBUG_LOG_EXPIRED );
+
+    $text = $this->is_network_mode()
+      ? __( 'Alt Text Generator debug logging was turned off automatically after 7 days. Turn it back on in Network Admin → Settings → Alt Text Generator if you still need it.', 'presswell-alt-text-generator' )
+      : __( 'Alt Text Generator debug logging was turned off automatically after 7 days. Turn it back on in Settings if you still need it.', 'presswell-alt-text-generator' );
 
     echo wp_kses_post(
       $this->render_view_to_string(
         'admin-notice.php',
         [
           'class' => 'notice notice-warning is-dismissible',
-          'text'  => __( 'Alt Text Generator debug logging was turned off automatically after 7 days. Turn it back on in Settings if you still need it.', 'presswell-alt-text-generator' ),
+          'text'  => $text,
         ]
       )
     );
   }
 
   /**
-   * Transient that carries a Test Connection result to the admin who ran it.
+   * Transient that carries a notice (Test Connection result, settings saved) to
+   * the admin whose request queued it.
    *
    * @return string
    */
@@ -883,19 +950,38 @@ trait PWATG_Settings_Trait {
     return PWATG::TRANSIENT_NOTICE_TEST_PROVIDER . '_' . get_current_user_id();
   }
 
-  /** Process the "Test Connection" helper form. */
+  /**
+   * Process the Debug tab's "Test Connection" form.
+   *
+   * The form sends no fields, so the saved provider, model, and key are tested.
+   * Requests that name a service, model, or key test those instead.
+   */
   public function handle_test_provider() {
-    if ( ! current_user_can( 'manage_options' ) ) {
-      wp_die( esc_html__( 'You do not have permission to do that.', 'presswell-alt-text-generator' ) );
+    if ( ! $this->can_test_provider() ) {
+      wp_die( esc_html__( 'You do not have permission to do that.', 'presswell-alt-text-generator' ), '', [ 'response' => 403 ] );
     }
 
     check_admin_referer( PWATG::AJAX_TEST_PROVIDER, 'pwatg_test_provider_nonce' );
 
-    $service = isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '';
-    $model   = isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '';
-    $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
+    // Testing spends provider credits, so it must not run from a link or a prefetch.
+    $method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '';
+    if ( 'POST' !== $method ) {
+      wp_die( esc_html__( 'This action must be sent as a POST request.', 'presswell-alt-text-generator' ), '', [ 'response' => 405 ] );
+    }
 
-    $settings         = $this->get_settings();
+    $settings = $this->get_settings();
+    $service  = isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '';
+    $model    = isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '';
+    $api_key  = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
+
+    if ( '' === $service ) {
+      $service = $this->get_active_service( $settings );
+    }
+
+    if ( '' === $model ) {
+      $model = isset( $settings['model'] ) ? (string) $settings['model'] : '';
+    }
+
     $connector_source = isset( $settings['connector_source'] ) ? sanitize_key( (string) $settings['connector_source'] ) : 'plugin';
     if ( ! in_array( $connector_source, [ 'plugin', 'core' ], true ) ) {
       $connector_source = 'plugin';
@@ -940,16 +1026,9 @@ trait PWATG_Settings_Trait {
           'connector_source' => $connector_source,
         ]
       );
-      set_transient(
-        $this->get_test_provider_notice_key(),
-        [
-          'type'    => 'error',
-          'message' => __( 'Service, model, and API key are required to test the connection.', 'presswell-alt-text-generator' ),
-        ],
-        PWATG::TRANSIENT_NOTICE_TTL
-      );
+      $this->queue_admin_notice( 'error', __( 'Service, model, and API key are required to test the connection.', 'presswell-alt-text-generator' ) );
 
-      wp_safe_redirect( PWATG::SETTINGS_PAGE_URL );
+      wp_safe_redirect( $this->get_debug_log_viewer_url(), 303 );
       exit;
     }
 
@@ -968,17 +1047,13 @@ trait PWATG_Settings_Trait {
           'message'          => $result->get_error_message(),
         ]
       );
-      set_transient(
-        $this->get_test_provider_notice_key(),
-        [
-          'type'    => 'error',
-          'message' => sprintf(
-            /* translators: %s: provider error message */
-            __( 'Connection failed: %s', 'presswell-alt-text-generator' ),
-            $result->get_error_message()
-          ),
-        ],
-        PWATG::TRANSIENT_NOTICE_TTL
+      $this->queue_admin_notice(
+        'error',
+        sprintf(
+          /* translators: %s: provider error message */
+          __( 'Connection failed: %s', 'presswell-alt-text-generator' ),
+          $result->get_error_message()
+        )
       );
     } else {
       $this->debug_log(
@@ -1003,17 +1078,11 @@ trait PWATG_Settings_Trait {
         );
       }
 
-      set_transient(
-        $this->get_test_provider_notice_key(),
-        [
-          'type'    => 'success',
-          'message' => $message,
-        ],
-        PWATG::TRANSIENT_NOTICE_TTL
-      );
+      $this->queue_admin_notice( 'success', $message );
     }
 
-    wp_safe_redirect( PWATG::SETTINGS_PAGE_URL );
+    // The form lives on the Debug tab, which shows the result.
+    wp_safe_redirect( $this->get_debug_log_viewer_url(), 303 );
     exit;
   }
 }

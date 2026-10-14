@@ -10,7 +10,7 @@ class SettingsTest extends WP_UnitTestCase {
   public function setUp(): void {
     parent::setUp();
     $this->plugin = presswell_alt_text_generator();
-    delete_option( PWATG::SETTINGS_KEY );
+    pwatg_test_delete_option( PWATG::SETTINGS_KEY );
   }
 
   public function tearDown(): void {
@@ -51,8 +51,7 @@ class SettingsTest extends WP_UnitTestCase {
   }
 
   public function test_get_settings_merges_saved_values_with_defaults() {
-    update_option(
-      PWATG::SETTINGS_KEY,
+    pwatg_test_update_option( PWATG::SETTINGS_KEY,
       [
         'service'  => 'anthropic',
         'api_keys' => [
@@ -71,6 +70,7 @@ class SettingsTest extends WP_UnitTestCase {
 
   public function test_sanitize_settings_enforces_allowed_values() {
     $input = [
+      'connector_source' => 'plugin',
       'service'       => 'invalid-service',
       'model'         => 'not-a-real-model',
       'prompt_seed'   => '   ',
@@ -93,18 +93,67 @@ class SettingsTest extends WP_UnitTestCase {
     $this->assertSame( 'anth-456', $sanitized['api_keys']['anthropic'] );
   }
 
-  public function test_defaults_use_plugin_keys_when_no_core_connector_has_a_key() {
+  public function test_new_installs_default_to_wordpress_ai_connectors() {
+    $this->assertSame( 'core', $this->plugin->get_default_settings()['connector_source'] );
+  }
+
+  public function test_the_core_default_applies_even_before_a_connector_has_a_key() {
     if ( ! function_exists( 'wp_get_connectors' ) ) {
       $this->markTestSkipped( 'Requires WordPress AI Connectors.' );
     }
 
     $this->assertTrue( $this->plugin->has_active_core_connectors(), 'WordPress registers its connectors even without keys.' );
 
+    $this->assertSame( 'core', $this->plugin->get_settings()['connector_source'] );
+  }
+
+  public function test_without_core_connectors_settings_fall_back_to_plugin_keys() {
+    // No connector maps to a provider, as on WordPress before 7.0.
+    add_filter( 'pwatg_core_connector_service_map', '__return_empty_array' );
+
     $settings = $this->plugin->get_settings();
 
     $this->assertSame( 'plugin', $settings['connector_source'] );
     $this->assertSame( 'openai', $settings['service'] );
     $this->assertSame( 'gpt-4.1-mini', $settings['model'] );
+  }
+
+  public function test_a_saved_plugin_source_is_not_changed_by_the_new_default() {
+    if ( ! function_exists( 'wp_get_connectors' ) ) {
+      $this->markTestSkipped( 'Requires WordPress AI Connectors.' );
+    }
+
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'plugin', 'service' => 'openai' ] );
+
+    $this->assertSame( 'plugin', $this->plugin->get_settings()['connector_source'] );
+  }
+
+  /**
+   * @dataProvider provider_connector_sources
+   */
+  public function test_the_deprecation_warning_shows_only_for_plugin_keys( $source, $warned ) {
+    if ( ! function_exists( 'wp_get_connectors' ) ) {
+      $this->markTestSkipped( 'Requires WordPress AI Connectors.' );
+    }
+
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => $source ] );
+
+    ob_start();
+    $this->plugin->render_connector_source_field();
+    $html = (string) ob_get_clean();
+
+    // The notice is always in the markup so settings.js can show it when the radio changes.
+    $this->assertMatchesRegularExpression( '/<div class="notice notice-warning inline pwatg-plugin-source-deprecated"\s*(hidden)?\s*>/', $html );
+    $this->assertStringContainsString( 'are deprecated and will be removed in a future release', $html );
+    $this->assertStringContainsString( 'href="' . esc_url( admin_url( 'options-connectors.php' ) ) . '"', $html );
+    $this->assertSame( ! $warned, (bool) preg_match( '/pwatg-plugin-source-deprecated"\s*hidden/', $html ) );
+  }
+
+  public function provider_connector_sources() {
+    return [
+      'plugin keys' => [ 'plugin', true ],
+      'core'        => [ 'core', false ],
+    ];
   }
 
   public function test_defaults_pick_the_core_connector_that_has_a_key() {
@@ -132,7 +181,7 @@ class SettingsTest extends WP_UnitTestCase {
     }
 
     update_option( 'connectors_ai_google_api_key', 'g-test' );
-    update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'core', 'core_connector' => 'openai', 'service' => 'openai', 'model' => 'gpt-4o' ] );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'core', 'core_connector' => 'openai', 'service' => 'openai', 'model' => 'gpt-4o' ] );
 
     $settings = $this->plugin->get_settings();
 
@@ -144,7 +193,7 @@ class SettingsTest extends WP_UnitTestCase {
    * @dataProvider provider_retired_models
    */
   public function test_retired_saved_models_fall_back_to_the_provider_default( $service, $retired, $expected ) {
-    update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'plugin', 'service' => $service, 'model' => $retired ] );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'connector_source' => 'plugin', 'service' => $service, 'model' => $retired ] );
 
     $this->assertSame( $expected, $this->plugin->get_settings()['model'] );
   }
@@ -187,7 +236,7 @@ class SettingsTest extends WP_UnitTestCase {
   }
 
   public function test_debug_logging_saved_as_off_stays_off() {
-    update_option( PWATG::SETTINGS_KEY, [ 'debug_logging' => 'off' ] );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, [ 'debug_logging' => 'off' ] );
 
     $this->assertSame( 'off', $this->plugin->get_settings()['debug_logging'] );
     $this->assertSame( 'off', $this->plugin->sanitize_settings( [ 'debug_logging' => 'off' ] )['debug_logging'] );

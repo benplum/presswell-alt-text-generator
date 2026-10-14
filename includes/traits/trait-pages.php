@@ -65,7 +65,7 @@ trait PWATG_Pages_Trait {
       return false;
     }
 
-    return in_array( $screen->id, [ PWATG::SETTINGS_PAGE_SCREEN_ID, PWATG::BULK_PAGE_SCREEN_ID ], true );
+    return in_array( $screen->id, [ PWATG::SETTINGS_PAGE_SCREEN_ID, PWATG::NETWORK_SETTINGS_SCREEN_ID, PWATG::BULK_PAGE_SCREEN_ID ], true );
   }
 
   /**

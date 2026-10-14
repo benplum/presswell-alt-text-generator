@@ -4,21 +4,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Inline action link shown within the Media Library list table.
+ * Inline action shown within the Media Library list table.
  *
- * @var string $url
+ * Generation changes data, so it runs only as a POST from assets/js/media.js.
+ *
  * @var int    $attachment_id
+ * @var string $nonce
  * @var bool   $has_alt
  * @var string $button_label
  */
 ?>
 <span class="pwatg-row-action">
-  <a href="<?php echo esc_url( $url ); ?>"
-    class="pwatg-generate-alt-action" 
-    data-attachment-id="<?php echo esc_attr( (int) $attachment_id ); ?>" 
-    data-has-alt="<?php echo ! empty( $has_alt ) ? '1' : '0'; ?>" 
-  >
-    <?php echo esc_html( $button_label ); ?>
-  </a>
+  <button type="button"
+    class="button-link pwatg-generate-alt-action"
+    data-attachment-id="<?php echo esc_attr( (int) $attachment_id ); ?>"
+    data-nonce="<?php echo esc_attr( $nonce ); ?>"
+    data-has-alt="<?php echo ! empty( $has_alt ) ? '1' : '0'; ?>"
+  ><?php echo esc_html( $button_label ); ?></button>
   <span class="pwatg-inline-action-status" aria-live="polite"></span>
 </span>

@@ -117,8 +117,8 @@ jQuery(function($) {
       return;
     }
 
-    if (typeof data.missing !== 'undefined') {
-      setMissingCount(data.missing);
+    if (typeof data.missingCount !== 'undefined') {
+      setMissingCount(data.missingCount);
     }
   })();
 

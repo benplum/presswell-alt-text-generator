@@ -105,6 +105,7 @@ All identifiers live on the `PWXX` class in `includes/helpers/class-constants.ph
 The code follows the WordPress Coding Standards, with these house rules.
 
 - **Indentation**: 2 spaces, LF line endings, final newline (see `.editorconfig`). No tabs.
+- **Compatibility**: PHP 7.4+ (`Requires PHP: 7.4` in the plugin header and readme). Typed properties, arrow functions, and `??=` are fine; PHP 8 syntax is not: `match`, `?->`, union types, named arguments, constructor promotion, attributes. WordPress polyfills `str_contains()`, `str_starts_with()`, and `str_ends_with()`.
 - **Arrays**: short syntax `[]` everywhere.
 - **Spacing**: spaces inside parentheses and brackets with variables, as WPCS does: `foo( $a, $b )`, `$arr[ $key ]`, `[ 'a' => 1 ]`, `! empty( $x )`.
 - **Comparisons**: Yoda conditions for literals (`'on' === $value`), strict equality, and `in_array( $needle, $haystack, true )`.

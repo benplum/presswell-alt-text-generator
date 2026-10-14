@@ -16,7 +16,7 @@ class ImagePreparationTest extends WP_UnitTestCase {
     $settings['api_keys']['openai'] = 'sk-test';
     $settings['connector_source']   = 'plugin';
     $settings['auto_generate']      = '';
-    update_option( PWATG::SETTINGS_KEY, $settings );
+    pwatg_test_update_option( PWATG::SETTINGS_KEY, $settings );
 
     PWATG_Test_Provider::reset();
     add_filter( 'pwatg_provider_registry', [ $this, 'override_provider_map' ] );
@@ -91,6 +91,40 @@ class ImagePreparationTest extends WP_UnitTestCase {
 
     $this->assertSame( 'image/jpeg', $image['mime_type'] );
     $this->assertSame( 'image/jpeg', getimagesizefromstring( $image['binary'] )['mime'] );
+  }
+
+  public function test_conversion_is_not_remapped_by_output_format_filters() {
+    if ( ! wp_image_editor_supports( [ 'mime_type' => 'image/gif' ] ) || ! wp_image_editor_supports( [ 'mime_type' => 'image/webp' ] ) ) {
+      $this->markTestSkipped( 'This server cannot convert GIF to WebP.' );
+    }
+
+    // What Modern Image Formats (Performance Lab) does to every JPEG the editor saves.
+    $to_webp = static function ( $formats ) {
+      $formats['image/jpeg'] = 'image/webp';
+      return $formats;
+    };
+    add_filter( 'image_editor_output_format', $to_webp );
+
+    $attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/test-image-2.gif' );
+    $image         = $this->prepare( $attachment_id );
+
+    remove_filter( 'image_editor_output_format', $to_webp );
+
+    $actual = getimagesizefromstring( $image['binary'] )['mime'];
+    $this->assertSame( $actual, $image['mime_type'], 'The label matches the bytes.' );
+    $this->assertSame( 'image/jpeg', $actual );
+    $this->assertFalse( isset( $GLOBALS['wp_filter']['image_editor_output_format']->callbacks[ PHP_INT_MAX ] ), 'The override is removed after saving.' );
+  }
+
+  public function test_backslashes_in_alt_text_are_kept() {
+    PWATG_Test_Provider::$response = 'Path C:\\Photos\\cat shown in a dialog';
+    $attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, wp_slash( 'Old \\ text' ) );
+
+    $this->assertTrue( $this->plugin->generate_alt_text_for_attachment( $attachment_id, true ) );
+
+    $this->assertSame( 'Path C:\\Photos\\cat shown in a dialog', get_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, true ) );
+    $this->assertSame( 'Old \\ text', get_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, true ) );
   }
 
   public function provider_convertible_formats() {

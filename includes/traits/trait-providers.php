@@ -286,7 +286,7 @@ trait PWATG_Providers_Trait {
 
   /** @return mixed Stored lock payload. */
   protected function get_rate_limit_transient() {
-    return is_multisite() ? get_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : get_transient( PWATG::RATE_LIMIT_TRANSIENT );
+    return $this->is_network_mode() ? get_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : get_transient( PWATG::RATE_LIMIT_TRANSIENT );
   }
 
   /**
@@ -294,11 +294,11 @@ trait PWATG_Providers_Trait {
    * @param int   $duration Seconds.
    */
   protected function set_rate_limit_transient( array $payload, $duration ) {
-    return is_multisite() ? set_site_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration ) : set_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration );
+    return $this->is_network_mode() ? set_site_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration ) : set_transient( PWATG::RATE_LIMIT_TRANSIENT, $payload, $duration );
   }
 
   protected function delete_rate_limit_transient() {
-    return is_multisite() ? delete_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
+    return $this->is_network_mode() ? delete_site_transient( PWATG::RATE_LIMIT_TRANSIENT ) : delete_transient( PWATG::RATE_LIMIT_TRANSIENT );
   }
 
   /**
@@ -484,11 +484,12 @@ trait PWATG_Providers_Trait {
     $alt_text = $this->limit_alt_text_length( $alt_text, 220 );
 
     // Keep what was there so an overwrite can be undone from the attachment screen.
+    // Meta functions unslash their input, so slash it to keep any backslashes.
     if ( '' !== $current_alt && $current_alt !== $alt_text ) {
-      update_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, $current_alt );
+      update_post_meta( $attachment_id, PWATG::META_KEY_PREVIOUS_ALT, wp_slash( $current_alt ) );
     }
 
-    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, $alt_text );
+    update_post_meta( $attachment_id, PWATG::META_KEY_ALT_TEXT, wp_slash( $alt_text ) );
     update_post_meta( $attachment_id, PWATG::META_KEY_LAST_GENERATED, (string) current_time( 'timestamp', true ) );
 
     $this->debug_log(
@@ -629,8 +630,17 @@ trait PWATG_Providers_Trait {
       require_once ABSPATH . 'wp-admin/includes/file.php';
     }
 
+    // Plugins such as Modern Image Formats map JPEG output to WebP or AVIF through
+    // this filter; AVIF is a format some providers reject, so ask for JPEG as-is.
+    $no_format_mapping = static function () {
+      return [];
+    };
+
+    add_filter( 'image_editor_output_format', $no_format_mapping, PHP_INT_MAX );
     $temp  = wp_tempnam( 'pwatg-image' );
     $saved = $editor->save( $temp, 'image/jpeg' );
+    remove_filter( 'image_editor_output_format', $no_format_mapping, PHP_INT_MAX );
+
     if ( is_wp_error( $saved ) || empty( $saved['path'] ) ) {
       if ( $temp && file_exists( $temp ) ) {
         wp_delete_file( $temp );
@@ -652,9 +662,12 @@ trait PWATG_Providers_Trait {
       return new WP_Error( 'pwatg_file_too_large', __( 'Image file is too large to send for alt text generation.', 'presswell-alt-text-generator' ) );
     }
 
+    // Label the bytes with what was actually written, in case another filter changed it.
+    $mime_type = ! empty( $saved['mime-type'] ) ? (string) $saved['mime-type'] : 'image/jpeg';
+
     return [
       'binary'    => $binary,
-      'mime_type' => 'image/jpeg',
+      'mime_type' => $mime_type,
       'file'      => $path,
     ];
   }
@@ -740,37 +753,12 @@ trait PWATG_Providers_Trait {
     $cut = mb_substr( $alt_text, 0, $limit );
 
     // Drop the partial last word, unless that would lose too much (one very long word).
-    // A regex rather than mb_strrpos(), which WordPress doesn't polyfill without mbstring.
-    $trimmed = preg_replace( '/\s+\S*$/u', '', $cut );
-    if ( is_string( $trimmed ) && mb_strlen( $trimmed ) > $limit * 0.6 ) {
+    $trimmed = PWATG_Provider_Service::drop_partial_word( $cut );
+    if ( mb_strlen( $trimmed ) > $limit * 0.6 ) {
       $cut = $trimmed;
     }
 
     return rtrim( $cut, " ,;:-" );
-  }
-
-  protected function request_openai_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
-    return PWATG_OpenAI_Service::request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary );
-  }
-
-  protected function request_openai_text( $api_key, $model, $prompt ) {
-    return PWATG_OpenAI_Service::request_text( $api_key, $model, $prompt );
-  }
-
-  protected function request_anthropic_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
-    return PWATG_Anthropic_Service::request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary );
-  }
-
-  protected function request_anthropic_text( $api_key, $model, $prompt ) {
-    return PWATG_Anthropic_Service::request_text( $api_key, $model, $prompt );
-  }
-
-  protected function request_gemini_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary ) {
-    return PWATG_Gemini_Service::request_alt_text( $api_key, $model, $prompt, $mime_type, $image_binary );
-  }
-
-  protected function request_gemini_text( $api_key, $model, $prompt ) {
-    return PWATG_Gemini_Service::request_text( $api_key, $model, $prompt );
   }
 
   /**
@@ -894,7 +882,8 @@ trait PWATG_Providers_Trait {
       return '';
     }
 
-    if ( is_multisite() && function_exists( 'get_blog_option' ) ) {
+    // Network mode shares one configuration, kept with the main site; per-site installs use their own.
+    if ( $this->is_network_mode() && function_exists( 'get_blog_option' ) ) {
       $raw_value = get_blog_option( get_main_site_id(), $setting_name, '' );
     } else {
       $raw_value = get_option( $setting_name, '' );

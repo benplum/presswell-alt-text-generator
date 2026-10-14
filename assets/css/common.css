@@ -1,3 +1,10 @@
+/* Every plugin screen shares one width. */
+
+.wrap.pwatg-settings,
+.wrap.pwatg-bulk-page {
+  max-width: 1000px;
+}
+
 /*
  * Shared by the plugin's admin screens. Uses the core admin palette so the plugin
  * reads as part of WordPress.

@@ -204,11 +204,139 @@ class ProvidersTest extends WP_UnitTestCase {
       'anthropic permission'          => [ 'anthropic', 403, [ 'error' => [ 'type' => 'permission_error', 'message' => 'Not allowed' ] ], 'pwatg_api_error', null ],
       'anthropic unknown model'       => [ 'anthropic', 404, [ 'error' => [ 'type' => 'not_found_error', 'message' => 'model: claude-3-opus' ] ], 'pwatg_api_error', null ],
       'gemini rate limit'             => [ 'gemini', 429, [ 'error' => [ 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'Resource has been exhausted (e.g. check rate limits).' ] ], 'pwatg_rate_limited', null ],
-      'gemini quota'                  => [ 'gemini', 429, [ 'error' => [ 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'You exceeded your current quota, please check your plan.' ] ], 'pwatg_quota_exceeded', null ],
+      'gemini per-minute quota'       => [ 'gemini', 429, self::gemini_quota_body( 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', '34s' ), 'pwatg_rate_limited', 34 ],
+      'gemini quota without details'  => [ 'gemini', 429, [ 'error' => [ 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'You exceeded your current quota, please check your plan and billing details.' ] ], 'pwatg_rate_limited', null ],
+      'gemini fractional retry delay' => [ 'gemini', 429, self::gemini_quota_body( 'GenerateContentInputTokensPerModelPerMinute-FreeTier', '1.2s' ), 'pwatg_rate_limited', 2 ],
+      'gemini daily quota'            => [ 'gemini', 429, self::gemini_quota_body( 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', '16s' ), 'pwatg_quota_exceeded', 16 ],
+      'gemini daily quota metric'     => [ 'gemini', 429, self::gemini_quota_body( '', '', 'generativelanguage.googleapis.com/generate_requests_per_day' ), 'pwatg_quota_exceeded', null ],
       'gemini overloaded'             => [ 'gemini', 503, [ 'error' => [ 'status' => 'UNAVAILABLE', 'message' => 'The model is overloaded.' ] ], 'pwatg_rate_limited', 60 ],
       'gemini permission'             => [ 'gemini', 403, [ 'error' => [ 'status' => 'PERMISSION_DENIED', 'message' => 'API key not valid.' ] ], 'pwatg_api_error', null ],
       'payment required'              => [ 'openai', 402, [ 'error' => [ 'message' => 'Payment required' ] ], 'pwatg_quota_exceeded', null ],
     ];
+  }
+
+  /**
+   * A Gemini 429 body as the API sends it: the same "quota" wording for every limit,
+   * with the kind of limit only in error.details.
+   */
+  protected static function gemini_quota_body( $quota_id, $retry_delay, $quota_metric = 'generativelanguage.googleapis.com/generate_content_free_tier_requests' ) {
+    $details = [
+      [
+        '@type'      => 'type.googleapis.com/google.rpc.QuotaFailure',
+        'violations' => [ array_filter( [ 'quotaMetric' => $quota_metric, 'quotaId' => $quota_id ] ) ],
+      ],
+      [
+        '@type' => 'type.googleapis.com/google.rpc.Help',
+        'links' => [ [ 'description' => 'Learn more', 'url' => 'https://ai.google.dev/gemini-api/docs/rate-limits' ] ],
+      ],
+    ];
+
+    if ( '' !== $retry_delay ) {
+      $details[] = [ '@type' => 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay' => $retry_delay ];
+    }
+
+    return [
+      'error' => [
+        'code'    => 429,
+        'status'  => 'RESOURCE_EXHAUSTED',
+        'message' => 'You exceeded your current quota, please check your plan and billing details.',
+        'details' => $details,
+      ],
+    ];
+  }
+
+  public function test_a_gemini_per_minute_limit_pauses_briefly_not_for_an_hour() {
+    $plugin = presswell_alt_text_generator();
+    $url    = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    $this->mock_http_response( $url, $this->build_http_response( 429, self::gemini_quota_body( 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', '34s' ) ) );
+
+    $error    = PWATG_Gemini_Service::request_alt_text( 'gm-key', 'gemini-2.5-flash', 'Prompt', 'image/jpeg', 'bin' );
+    $duration = new ReflectionMethod( $plugin, 'determine_rate_limit_duration' );
+    $duration->setAccessible( true );
+
+    $this->assertLessThan( PWATG::QUOTA_LOCK_SECONDS, $duration->invoke( $plugin, $error ) );
+  }
+
+  public function test_gemini_pro_gets_a_small_thinking_budget() {
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
+    $this->mock_http_response( $url, $this->build_http_response( 200, [ 'candidates' => [ [ 'content' => [ 'parts' => [ [ 'text' => 'OK' ] ] ] ] ] ] ) );
+
+    PWATG_Gemini_Service::request_alt_text( 'gm-key', 'gemini-2.5-pro', 'Prompt', 'image/jpeg', 'bin' );
+
+    $config = json_decode( $this->captured_request['body'], true )['generationConfig'];
+    $this->assertSame( 128, $config['thinkingConfig']['thinkingBudget'], 'Pro cannot turn thinking off, so it is capped instead.' );
+    $this->assertGreaterThan( 128, $config['maxOutputTokens'] );
+  }
+
+  /**
+   * @dataProvider provider_openai_token_params
+   */
+  public function test_openai_reasoning_models_get_max_completion_tokens( $model, $expected_param ) {
+    $this->mock_http_response( 'https://api.openai.com/v1/chat/completions', $this->build_http_response( 200, [ 'choices' => [ [ 'message' => [ 'content' => 'A cat.' ] ] ] ] ) );
+
+    PWATG_OpenAI_Service::request_alt_text( 'sk-test', $model, 'Prompt', 'image/png', 'bin' );
+
+    $payload = json_decode( $this->captured_request['body'], true );
+    $other   = 'max_tokens' === $expected_param ? 'max_completion_tokens' : 'max_tokens';
+    $this->assertArrayHasKey( $expected_param, $payload );
+    $this->assertArrayNotHasKey( $other, $payload );
+  }
+
+  public function provider_openai_token_params() {
+    return [
+      'gpt-4.1-mini' => [ 'gpt-4.1-mini', 'max_tokens' ],
+      'gpt-4o'       => [ 'gpt-4o', 'max_tokens' ],
+      'o1'           => [ 'o1', 'max_completion_tokens' ],
+      'o3-mini'      => [ 'o3-mini', 'max_completion_tokens' ],
+      'o4-mini'      => [ 'o4-mini', 'max_completion_tokens' ],
+      'gpt-5'        => [ 'gpt-5', 'max_completion_tokens' ],
+      'gpt-5-mini'   => [ 'gpt-5-mini', 'max_completion_tokens' ],
+      'gpt-5.1'      => [ 'gpt-5.1', 'max_completion_tokens' ],
+    ];
+  }
+
+  /**
+   * @dataProvider provider_truncated_responses
+   */
+  public function test_output_cut_off_at_the_token_limit_is_trimmed( $service, $body, $expected ) {
+    $urls    = [
+      'openai'    => 'https://api.openai.com/v1/chat/completions',
+      'anthropic' => 'https://api.anthropic.com/v1/messages',
+      'gemini'    => 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    ];
+    $classes = [
+      'openai'    => 'PWATG_OpenAI_Service',
+      'anthropic' => 'PWATG_Anthropic_Service',
+      'gemini'    => 'PWATG_Gemini_Service',
+    ];
+
+    $this->mock_http_response( $urls[ $service ], $this->build_http_response( 200, $body ) );
+
+    $model = 'gemini' === $service ? 'gemini-2.5-flash' : 'model';
+    $this->assertSame( $expected, call_user_func( [ $classes[ $service ], 'request_alt_text' ], 'key', $model, 'Prompt', 'image/png', 'bin' ) );
+  }
+
+  public function provider_truncated_responses() {
+    $two_sentences = 'A red barn in a green field. Two horses graze beside a wooden fen';
+    $one_sentence  = 'A red barn in a green field with two horses grazing beside a wooden fen';
+
+    return [
+      'openai to last sentence'     => [ 'openai', [ 'choices' => [ [ 'message' => [ 'content' => $two_sentences ], 'finish_reason' => 'length' ] ] ], 'A red barn in a green field.' ],
+      'openai partial word dropped' => [ 'openai', [ 'choices' => [ [ 'message' => [ 'content' => $one_sentence ], 'finish_reason' => 'length' ] ] ], 'A red barn in a green field with two horses grazing beside a wooden' ],
+      'openai complete untouched'   => [ 'openai', [ 'choices' => [ [ 'message' => [ 'content' => $one_sentence ], 'finish_reason' => 'stop' ] ] ], $one_sentence ],
+      'anthropic max_tokens'        => [ 'anthropic', [ 'stop_reason' => 'max_tokens', 'content' => [ [ 'type' => 'text', 'text' => $two_sentences ] ] ], 'A red barn in a green field.' ],
+      'anthropic end_turn'          => [ 'anthropic', [ 'stop_reason' => 'end_turn', 'content' => [ [ 'type' => 'text', 'text' => $one_sentence ] ] ], $one_sentence ],
+      'gemini MAX_TOKENS'           => [ 'gemini', [ 'candidates' => [ [ 'finishReason' => 'MAX_TOKENS', 'content' => [ 'parts' => [ [ 'text' => $one_sentence ] ] ] ] ] ], 'A red barn in a green field with two horses grazing beside a wooden' ],
+      'gemini STOP'                 => [ 'gemini', [ 'candidates' => [ [ 'finishReason' => 'STOP', 'content' => [ 'parts' => [ [ 'text' => $two_sentences ] ] ] ] ] ], $two_sentences ],
+    ];
+  }
+
+  public function test_key_like_strings_are_masked_in_messages() {
+    $masked = PWATG_Provider_Service::redact_secrets( 'Incorrect API key provided: sk-proj-abc1***************wxyz. You can find your API key at https://platform.openai.com/account/api-keys.' );
+
+    $this->assertStringNotContainsString( 'sk-proj', $masked );
+    $this->assertStringContainsString( 'https://platform.openai.com/account/api-keys', $masked );
+    $this->assertStringNotContainsString( 'AIzaSyD1234567890', PWATG_Provider_Service::redact_secrets( 'API key AIzaSyD1234567890abcdef not valid.' ) );
   }
 
   public function test_a_permission_error_does_not_pause_generation() {

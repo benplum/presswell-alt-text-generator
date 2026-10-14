@@ -3,7 +3,8 @@ Contributors: presswell, benplum
 Tags: accessibility, alt text, media library, ai, image seo
 Requires at least: 6.2
 Tested up to: 7.1
-Stable tag: 1.2.0
+Requires PHP: 7.4
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,7 +16,7 @@ Presswell Alt Text Generator helps teams reduce accessibility backlog by generat
 
 **Features**
 
-* Supports OpenAI, Anthropic Claude, and Google Gemini, with their own API keys or through WordPress AI Connectors
+* Supports OpenAI, Anthropic Claude, and Google Gemini through WordPress AI Connectors (recommended, WordPress 7.0+) or, deprecated, with API keys stored by the plugin
 * On WordPress 7.0+, can send requests through the WordPress AI Client, so the plugin stores no key
 * Generates alt text for individual images in the Media Library, the media modal, and the Image block
 * Generates alt text for new uploads automatically (optional)
@@ -37,6 +38,14 @@ Select an Image block to find an Alt Text Generator panel in its sidebar. It fil
 
 The Bulk page counts images missing alt text, allows regeneration preferences, and runs batches while surfacing progress, failures, and rate-limit pauses.
 
+***Debug Tab***
+
+*Settings -> Alt Text Generator -> Debug* shows how requests are sent and what can stop them (API key, rate limits, bulk runs, images missing alt text), a *Test Connection* button, and the private debug log.
+
+***Connector Source***
+
+WordPress AI Connectors (*Settings -> Connectors*, WordPress 7.0+) are the recommended setup and the default for new installs. The *Plugin* connector source, which stores API keys in this plugin's settings, is deprecated and will be removed in a future release; the settings screen shows a warning while it is selected. On WordPress versions without AI Connectors, the plugin keeps using its own keys.
+
 = Documentation =
 
 **Filters**
@@ -53,6 +62,7 @@ The Bulk page counts images missing alt text, allows regeneration preferences, a
 * `pwatg_core_connector_service_map` — Map WordPress AI Connector IDs to this plugin's provider slugs
 * `pwatg_service_connector_candidates` — Connector IDs checked for each provider's API key
 * `pwatg_debug_log_filename` — Filename of the private debug log
+* `pwatg_status_rows` — Rows of the Debug tab's status table (each an array with string `label` and `value`, and `status` of `ok`, `warning`, or an empty string; rows without a string label and value are dropped)
 
 **WP-CLI**
 
@@ -83,7 +93,7 @@ Install via the WordPress plugin installer, or manually upload the plugin direct
 
 1. Activate the plugin.
 2. Visit *Settings -> Alt Text Generator*. Choose *Core* to use a provider set up in *Settings -> Connectors* (WordPress 7.0+), or *Plugin* to enter an API key and choose a model.
-3. Use *Test Connection* to confirm the provider responds.
+3. Use *Test Connection* on the *Debug* tab to confirm the provider responds.
 4. (Optional) Turn *Generate on Upload* on or off.
 5. Use the bulk tool under *Media -> Alt Text Generator*, or the Media Library and Image block actions.
 
@@ -95,7 +105,7 @@ OpenAI (GPT-4.1 and GPT-4o, including the mini models), Anthropic Claude (Haiku 
 
 = Where are API keys stored? =
 
-In Core mode, keys are managed by WordPress in *Settings -> Connectors*. In Plugin mode, keys are stored in the site options table and sent only to the selected provider, from your server. Saved keys are never printed in the settings page, and they are removed when the plugin is deleted.
+In Core mode (recommended), keys are managed by WordPress in *Settings -> Connectors*. In the deprecated Plugin mode, keys are stored in the site's options (the network's, when the plugin is network-activated on Multisite) and sent only to the selected provider, from your server. Saved keys are never printed in the settings page, and they are removed when the plugin is deleted. Plugin mode will be removed in a future release, so switch to WordPress AI Connectors when you can.
 
 = Can I regenerate specific images without affecting others? =
 
@@ -104,6 +114,13 @@ Yes. Use the inline "Regenerate Alt Text" link in the Media Library or media mod
 = Can I run generation from WP-CLI? =
 
 Yes. Use `wp pwatg generate <attachment-id>` for one image, `wp pwatg bulk-generate` for a batch run, and `wp pwatg count-missing` to check remaining backlog.
+
+= How does it work on Multisite? =
+
+It depends on how the plugin is activated.
+
+* **Network-activated** (recommended for managing settings once): the AI provider, API keys, model, and prompt are set once for the whole network, in *Network Admin -> Settings -> Alt Text Generator*, so only Super Admins manage keys and costs. Each site can choose whether new uploads get alt text automatically (or follow the network's choice), and has its own Bulk screen and Debug tab. *Test Connection* on a site's Debug tab is available to Super Admins. Settings saved on the main site by earlier versions move to the network automatically.
+* **Activated on individual sites**: each site has its own settings page, API keys, and *Test Connection*, just like a single-site install.
 
 = Can I run bulk generation network-wide on Multisite? =
 
@@ -115,7 +132,7 @@ When a provider reports a rate limit, the plugin pauses requests to that provide
 
 == Privacy ==
 
-This plugin sends images to the AI provider you choose when generating alt text (OpenAI, Anthropic, or Google Gemini). Generation happens when you ask for it, and for new uploads when *Generate on Upload* is on. In Plugin mode, API keys are stored in WordPress options on your site and used only for requests your server sends to that provider.
+This plugin sends images to the AI provider you choose when generating alt text (OpenAI, Anthropic, or Google Gemini). Generation happens when you ask for it, and for new uploads when *Generate on Upload* is on. In the deprecated Plugin mode, API keys are stored in WordPress options on your site (or your network, when network-activated on Multisite) and used only for requests your server sends to that provider.
 
 == External Services ==
 
@@ -144,17 +161,25 @@ This plugin connects to an external AI service only when alt text is generated (
 
 == Screenshots ==
 
-1. Settings screen with provider, model, prompt, and API key controls.
-2. Bulk generator queue with progress and retry status.
-3. Alt text generation controls on media edit screen.
-4. Alt text generation controls in media modal.
+1. Alt text generation controls on the media edit screen.
+2. Alt text generation controls in the media modal.
+3. Bulk generator with progress and per-image results.
+4. Settings screen with connector, model, prompt, and upload controls.
+5. Debug screen with connection status, Test Connection, and the debug log.
 
 == Changelog ==
+
+= 1.3.0 =
+* Added Multisite network settings managed by Super Admins, with a per-site Generate on Upload choice.
+* Added a status table and Test Connection to the Debug tab.
+* Changed the default connection to WordPress AI Connectors. API keys stored by this plugin are deprecated and will be removed in a future release.
+* Fixed Gemini rate limits pausing generation for an hour.
+* Fixed image conversion, bulk generation, and various security and reliability issues.
 
 = 1.2.0 =
 * Fixed various performance and security issues.
 * Added site language support and filter.
-* Added debug functionality and imporoved logging.
+* Added debug functionality and improved logging.
 
 = 1.1.0 =
 * Added WordPress 7.0 Core AI Connector support with connector mode setting.

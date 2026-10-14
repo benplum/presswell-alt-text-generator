@@ -5,8 +5,12 @@ jQuery(function($) {
   const fieldName = data.fieldName || 'pwatg_generate_alt';
   const compatFieldSelector = '.compat-field-' + fieldName;
   const compatRowSelector = 'tr' + compatFieldSelector;
+  // Generation is AJAX-only. The attachment screen's request data arrives either as
+  // separate fields or packed into inlineUrl's query string.
+  const inlineParsed = parseActionUrl(data.inlineUrl || '');
   const inlineFallback = {
-    url: data.inlineUrl || '',
+    attachmentId: parseInt(data.inlineAttachmentId || '0', 10) || inlineParsed.attachmentId,
+    nonce: data.inlineNonce || inlineParsed.nonce,
     last: data.inlineLast || '',
     hasAlt: !!data.inlineHasAlt,
     hasPrevious: !!data.inlineHasPrevious,
@@ -15,10 +19,6 @@ jQuery(function($) {
 
   function t(key, fallback) {
     return Object.prototype.hasOwnProperty.call(strings, key) ? strings[key] : fallback;
-  }
-
-  function escapeHtml(value) {
-    return $('<div>').text(String(value || '')).html();
   }
 
   function hasAltTextValue(value) {
@@ -94,13 +94,13 @@ jQuery(function($) {
       return null;
     }
 
-    const link = row.find('a.button, a.button-secondary, a').first();
-    if (!link.length) {
+    const control = row.find('.pwatg-generate-alt-action').first();
+    if (!control.length) {
       return null;
     }
 
-    const href = link.attr('href') || '';
-    if (!href) {
+    const nonce = control.attr('data-nonce') || '';
+    if (!nonce) {
       return null;
     }
 
@@ -113,9 +113,9 @@ jQuery(function($) {
     const restore = row.find('.pwatg-restore-alt-action').first();
 
     return {
-      url: href,
-      attachmentId: link.attr('data-attachment-id') || '',
-      hasAlt: String(link.attr('data-has-alt') || '') === '1',
+      attachmentId: parseInt(control.attr('data-attachment-id') || '0', 10) || 0,
+      nonce: nonce,
+      hasAlt: String(control.attr('data-has-alt') || '') === '1',
       last: lastText || t('never', 'Never'),
       hasPrevious: restore.length > 0 && !restore.prop('hidden'),
       restoreNonce: restore.attr('data-nonce') || '',
@@ -221,12 +221,9 @@ jQuery(function($) {
       return;
     }
 
-    if (target.hasClass('pwatg-last-generated')) {
-      target.html('<strong>' + escapeHtml(label) + '</strong> ' + escapeHtml(value));
-      return;
-    }
-
-    target.html('<strong>' + escapeHtml(label) + '</strong> ' + escapeHtml(value));
+    target.empty()
+      .append($('<strong>').text(label))
+      .append(document.createTextNode(' ' + value));
   }
 
   function setButtonBusy($button, busy) {
@@ -243,22 +240,16 @@ jQuery(function($) {
 
   function handleGenerateClick(event) {
     const $button = $(event.currentTarget);
-    const href = $button.attr('href') || '';
-
-    if (!href || !ajaxAction) {
-      return;
-    }
 
     event.preventDefault();
 
-    if ($button.data('pwatgBusy')) {
+    if (!ajaxAction || $button.data('pwatgBusy')) {
       return;
     }
 
-    const parsed = parseActionUrl(href);
     const attachmentFromData = parseInt($button.attr('data-attachment-id') || '0', 10);
-    const attachmentId = parsed.attachmentId || (Number.isNaN(attachmentFromData) ? 0 : attachmentFromData);
-    const nonce = parsed.nonce;
+    const attachmentId = Number.isNaN(attachmentFromData) ? 0 : attachmentFromData;
+    const nonce = $button.attr('data-nonce') || '';
     const $status = getStatusContainerForButton($button);
 
     if (!attachmentId || !nonce) {
@@ -297,7 +288,7 @@ jQuery(function($) {
 
       writeHasAltToButton($button, hasAlt);
       syncActionLinksAfterSuccess($button, hasAlt);
-      setRestoreVisible($button.attr('data-attachment-id') || parseActionUrl($button.attr('href')).attachmentId, !!payload.has_previous);
+      setRestoreVisible(attachmentId, !!payload.has_previous);
 
       setLastGeneratedForButton($button, payload.last_generated || t('never', 'Never'));
     }).fail(function(xhr) {
@@ -325,7 +316,7 @@ jQuery(function($) {
       return String($(this).attr('data-attachment-id') || '') === id;
     }).prop('hidden', !visible);
 
-    if (String(parseActionUrl(inlineFallback.url).attachmentId || '') === id) {
+    if (String(inlineFallback.attachmentId || '') === id) {
       inlineFallback.hasPrevious = !!visible;
     }
   }
@@ -378,7 +369,7 @@ jQuery(function($) {
   }
 
   function renderInlineAction($target, actionData, cssClass) {
-    if (!$target.length || !actionData || !actionData.url) {
+    if (!$target.length || !actionData || !actionData.attachmentId || !actionData.nonce) {
       return;
     }
 
@@ -388,11 +379,11 @@ jQuery(function($) {
       .addClass(className)
       .addClass('pwatg-inline-action');
 
-    $('<a>')
+    $('<button>', { type: 'button' })
       .addClass('button button-secondary')
       .addClass('pwatg-generate-alt-action')
-      .attr('href', String(actionData.url))
-      .attr('data-attachment-id', String(actionData.attachmentId || ''))
+      .attr('data-attachment-id', String(actionData.attachmentId))
+      .attr('data-nonce', String(actionData.nonce))
       .attr('data-has-alt', actionData.hasAlt ? '1' : '0')
       .text(getActionLabel(!!actionData.hasAlt))
       .appendTo($wrapper);
@@ -407,7 +398,7 @@ jQuery(function($) {
         type: 'button',
         class: 'button-link pwatg-restore-alt-action',
         text: t('restoreButton', 'Restore previous alt text'),
-        'data-attachment-id': String(actionData.attachmentId || parseActionUrl(actionData.url).attachmentId || ''),
+        'data-attachment-id': String(actionData.attachmentId),
         'data-nonce': String(actionData.restoreNonce)
       }).prop('hidden', !actionData.hasPrevious).appendTo($wrapper);
     }
@@ -431,7 +422,7 @@ jQuery(function($) {
     }
 
     const fromCompat = getActionDataFromCompat($(document.body));
-    const actionData = fromCompat && fromCompat.url ? fromCompat : inlineFallback;
+    const actionData = fromCompat || inlineFallback;
     actionData.hasAlt = hasAltTextValue(altInput.val());
     renderInlineAction(target, actionData, 'pwatg-inline-manual-action');
 
@@ -450,7 +441,7 @@ jQuery(function($) {
 
       const scope = panel.closest('.media-modal-content, .media-modal, body');
       const actionData = getActionDataFromCompat(scope);
-      if (!actionData || !actionData.url) {
+      if (!actionData) {
         return;
       }
 
@@ -506,6 +497,6 @@ jQuery(function($) {
 
   $(document).on('attachment:compat:ready wp-mediaelement-loaded', scheduleRefresh);
 
-  $(document).on('click', 'a.pwatg-generate-alt-action, .pwatg-inline-action a.button, .pwatg-inline-action a.button-secondary', handleGenerateClick);
+  $(document).on('click', '.pwatg-generate-alt-action', handleGenerateClick);
   $(document).on('click', '.pwatg-restore-alt-action', handleRestoreClick);
 });

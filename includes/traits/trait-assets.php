@@ -55,36 +55,7 @@ trait PWATG_Assets_Trait {
     }
 
     if ( $this->is_settings_page( $hook_suffix ) && 'debug' === sanitize_key( $this->get_query_param( 'tab' ) ) ) {
-      wp_enqueue_script(
-        PWATG::ASSET_HANDLE_DEBUG_JS,
-        $this->get_asset_url( 'js/debug.js' ),
-        [],
-        PWATG::VERSION,
-        true
-      );
-
-      wp_localize_script(
-        PWATG::ASSET_HANDLE_DEBUG_JS,
-        PWATG::JS_OBJECT_DEBUG,
-        [
-          'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-          'nonce'   => wp_create_nonce( PWATG::NONCE_DEBUG ),
-          'actions' => [
-            'readLog'  => PWATG::AJAX_DEBUG_READ_LOG,
-            'clearLog' => PWATG::AJAX_DEBUG_CLEAR_LOG,
-          ],
-          'i18n'    => [
-            'loading'         => __( 'Loading...', 'presswell-alt-text-generator' ),
-            'requestFailed'   => __( 'Request failed.', 'presswell-alt-text-generator' ),
-            /* translators: %s: date and time logging turns off */
-            'logEnabledUntil' => __( 'Logging is on until %s.', 'presswell-alt-text-generator' ),
-            'logDisabled'     => __( 'Logging is off. Turn it on in Settings.', 'presswell-alt-text-generator' ),
-            'logTruncated'    => __( 'Showing the most recent lines; download for the full log.', 'presswell-alt-text-generator' ),
-            'logEmpty'        => __( 'The log is empty.', 'presswell-alt-text-generator' ),
-            'confirmClear'    => __( 'Delete the debug log?', 'presswell-alt-text-generator' ),
-          ],
-        ]
-      );
+      $this->enqueue_debug_log_assets();
     } elseif ( $this->is_settings_page( $hook_suffix ) ) {
       $settings  = $this->get_settings();
       $model_map = [];
@@ -227,14 +198,16 @@ trait PWATG_Assets_Trait {
 
     $current_post_param = filter_input( INPUT_GET, 'post', FILTER_UNSAFE_RAW );
     $current_post_id    = is_scalar( $current_post_param ) ? absint( (string) $current_post_param ) : 0;
-    $inline_url         = '';
+    $inline_id          = 0;
+    $inline_nonce       = '';
     $inline_last        = '';
     $inline_has_alt     = false;
     $inline_previous    = false;
     $inline_restore     = '';
 
     if ( $current_post_id > 0 && 'attachment' === get_post_type( $current_post_id ) ) {
-      $inline_url     = $this->get_single_action_url( $current_post_id );
+      $inline_id      = $current_post_id;
+      $inline_nonce   = $this->get_single_action_nonce( $current_post_id );
       $inline_last    = $this->get_last_generated_label( $current_post_id );
       $inline_current = (string) get_post_meta( $current_post_id, PWATG::META_KEY_ALT_TEXT, true );
       $inline_has_alt = '' !== trim( $inline_current );
@@ -256,7 +229,8 @@ trait PWATG_Assets_Trait {
       [
         // ajaxurl isn't defined when the media modal loads outside wp-admin.
         'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
-        'inlineUrl'    => $inline_url,
+        'inlineAttachmentId' => $inline_id,
+        'inlineNonce'  => $inline_nonce,
         'inlineLast'   => $inline_last,
         'inlineHasAlt' => $inline_has_alt,
         'inlineHasPrevious' => $inline_previous,
@@ -308,6 +282,7 @@ trait PWATG_Assets_Trait {
   private function is_settings_page( $hook_suffix ) {
     $page = sanitize_key( $this->get_query_param( 'page' ) );
 
+    // Network Admin's page has the same hook suffix; only its screen ID adds "-network".
     return PWATG::SETTINGS_PAGE_SCREEN_ID === $hook_suffix && PWATG::SETTINGS_PAGE_SLUG === $page;
   }
 
@@ -322,5 +297,54 @@ trait PWATG_Assets_Trait {
     $page = sanitize_key( $this->get_query_param( 'page' ) );
 
     return PWATG::BULK_PAGE_SCREEN_ID === $hook_suffix && PWATG::BULK_PAGE_SLUG === $page;
+  }
+
+  /**
+   * Load the Debug tab's log viewer, the same in every Presswell plugin.
+   */
+  public function enqueue_debug_log_assets() {
+    if ( ! $this->is_network_mode() ) {
+      $log_disabled = __( 'Logging is off. Turn it on in Settings.', 'presswell-alt-text-generator' );
+      $settings_url = admin_url( PWATG::SETTINGS_PAGE_URL );
+    } elseif ( current_user_can( 'manage_network_options' ) ) {
+      $log_disabled = __( 'Logging is off. Turn it on in Network Admin → Settings → Alt Text Generator.', 'presswell-alt-text-generator' );
+      $settings_url = $this->get_network_settings_url();
+    } else {
+      // Site admins can't reach Network Admin, so there's nothing to link.
+      $log_disabled = __( 'Logging is off. A network administrator can turn it on in Network Admin.', 'presswell-alt-text-generator' );
+      $settings_url = '';
+    }
+
+    wp_enqueue_script( PWATG::ASSET_HANDLE_DEBUG_LOG_JS, $this->get_asset_url( 'js/debug-log.js' ), [], PWATG::VERSION, true );
+
+    wp_localize_script(
+      PWATG::ASSET_HANDLE_DEBUG_LOG_JS,
+      PWATG::JS_OBJECT_DEBUG_LOG,
+      [
+        'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( PWATG::NONCE_DEBUG ),
+        'settingsUrl' => $settings_url,
+        'actions' => [
+          'readLog'  => PWATG::AJAX_DEBUG_READ_LOG,
+          'clearLog' => PWATG::AJAX_DEBUG_CLEAR_LOG,
+        ],
+        'i18n'    => [
+          'requestFailed'   => __( 'Request failed.', 'presswell-alt-text-generator' ),
+          /* translators: %s: date and time logging turns off */
+          'logEnabledUntil' => __( 'Logging is on until %s.', 'presswell-alt-text-generator' ),
+          'logDisabled'     => $log_disabled,
+          'openSettings'    => $this->is_network_mode() ? __( 'Open network settings', 'presswell-alt-text-generator' ) : __( 'Open settings', 'presswell-alt-text-generator' ),
+          /* translators: %s: file size, e.g. 12 KB */
+          'logSize'         => __( 'The log is %s.', 'presswell-alt-text-generator' ),
+          'logTruncated'    => __( 'Showing the most recent lines; download for the full log.', 'presswell-alt-text-generator' ),
+          'logEmpty'        => __( 'The log is empty.', 'presswell-alt-text-generator' ),
+          'confirmClear'    => __( "Delete the debug log? This can't be undone.", 'presswell-alt-text-generator' ),
+          /* translators: %s: size in kilobytes */
+          'sizeKb'          => __( '%s KB', 'presswell-alt-text-generator' ),
+          /* translators: %s: size in megabytes */
+          'sizeMb'          => __( '%s MB', 'presswell-alt-text-generator' ),
+        ],
+      ]
+    );
   }
 }
